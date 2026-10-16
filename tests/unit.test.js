@@ -521,6 +521,14 @@ console.log('all tests passed');
   assert.ok(batPose(1, 0.5, 'whiff', 3.4).tip.z < 3.4 - 0.5, '高球揮空：棒子從球下方掃過');
   assert.ok(batPose(1, 0.5, 'whiff', 1.9).tip.z > 1.9 + 0.5, '低球揮空：棒子從球上方掃過');
   assert.ok(ctc.ws < rdy.ws, '揮棒時肩膀轉動（側面寬度變窄）');
+  // 揮棒的順序：髖先轉、肩慢一點、棒子落後手、後腳跟離地、前腳踩下、重心前移、收棒繞過身體
+  const early = batPose(1, 0.15, 'contact', 2.5), swMid = batPose(1, 0.3, 'contact', 2.5), pre = batPose(1, 0, 'contact', 2.5);
+  assert.ok((pre.wh - swMid.wh) / 0.55 > (pre.ws - swMid.ws) / 0.75 + 0.05, '髖部轉得比肩膀快（以各自能轉的幅度算）');
+  assert.ok(swMid.tip.z > swMid.hands.z - 0.5 && swMid.tip.z > early.hands.z - 3, '棒子落後手：到 k=0.3 還沒甩平');
+  assert.ok(pre.footF.z > 0.3 && batPose(1, 0.2, 'contact', 2.5).footF.z === 0, '蓄力時前腳抬起，出棒後踩下');
+  assert.ok(ctc.footB.z > 0.2 && ctc.hip.x > 0.3, '碰到球時後腳跟離地、重心前移');
+  assert.ok(Math.abs(ctc.head.z - rdy.head.z) < 0.5 && Math.abs(ctc.head.x - rdy.head.x) < 0.5, '頭幾乎不動，眼睛盯著球');
+  assert.ok(flw.hands.x < ctc.hands.x - 0.7 && flw.hands.z > ctc.hands.z + 0.5, '收棒：雙手拉回身體另一側並抬高');
   const tk = batPose(0.6, 0, 'take', 2.5);
   assert.ok(tk.hands.x < 0.35 && tk.tip.z > tk.hands.z, '不揮的球只做蓄力：手往後、棒仍朝上');
   assert.strictEqual(frameAt(sc, 0).bat.type, 'take');

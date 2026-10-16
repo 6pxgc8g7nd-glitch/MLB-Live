@@ -216,27 +216,39 @@ export function batPose(load, k, type, z) {
   const swing = type !== 'take';
   const kk = swing ? k : 0;
   const ld = load;
-  const sw1 = ease(clamp(kk / 0.5, 0, 1)), sw2 = ease(clamp((kk - 0.5) / 0.5, 0, 1));
+  // 揮棒的順序：先是髖部帶頭轉（rH），肩膀慢一點跟上（rS），球棒落後手一截再甩過去（sB 前慢後快），碰到球（k=0.5）後收棒繞過肩膀（f2）
+  const rH = ease(clamp(kk / 0.45, 0, 1)), rS = ease(clamp((kk - 0.08) / 0.5, 0, 1));
+  const sB = Math.pow(ease(clamp(kk / 0.5, 0, 1)), 1.4), f2 = ease(clamp((kk - 0.5) / 0.5, 0, 1));
+  const sw1 = ease(clamp(kk / 0.5, 0, 1));
   const zc = clamp(z == null ? 2.6 : z, 1.7, 4.6);
   const zHit = type === 'whiff' ? zc + (zc > 2.7 ? -0.9 : 0.9) : zc; // 揮空：棒子從球的下方（或上方）掃過
   const base = -100 - 15 * ld;
-  const th = base * (1 - sw1) + 65 * sw2 + (type === 'foul' ? 10 * sw1 : 0); // 球棒角度：-90 = 朝上，0 = 水平朝本壘
+  const th = base * (1 - sB) + 110 * f2 + (type === 'foul' ? 10 * sB : 0); // 球棒角度：-90 = 朝上，0 = 水平朝本壘，收棒時繞到身體另一側
   const pre = 0.35 - 0.6 * ld;
   const hands = {
-    x: pre + (0.7 - pre) * sw1 - 0.5 * sw2,
-    z: (4.6 + 0.3 * ld) + (zHit + 0.1 - (4.6 + 0.3 * ld)) * sw1 + 0.7 * sw2,
+    x: pre + (0.7 - pre) * sw1 - 0.8 * f2,
+    z: (4.6 + 0.3 * ld) + (zHit + 0.1 - (4.6 + 0.3 * ld)) * sw1 + 0.75 * f2,
   };
   if (!swing) { hands.x = 0.15 - 0.45 * ld; hands.z = 4.6 + 0.3 * ld; }
   const rad = (th * Math.PI) / 180, L = 2.8;
   const tip = { x: hands.x + L * Math.cos(rad), z: hands.z - L * Math.sin(rad) };
-  const phi = swing ? (sw1 * 70 + sw2 * 35) : 0; // 身體轉動
-  const ws = 0.15 + 0.75 * Math.abs(Math.cos(((phi + 15) * Math.PI) / 180));
-  const wh = 0.15 + 0.55 * Math.abs(Math.cos(((phi * 0.7) * Math.PI) / 180));
-  const lean = -0.25 * ld + 0.35 * sw1 - 0.25 * sw2 + (type === 'whiff' ? 0.4 * sw2 : 0); // 揮空：重心被帶出去
-  const dip = type === 'whiff' ? 0.45 * sw2 : 0;
-  const sh = { x: lean * 0.4, z: 4.9 - dip };
+  const phiS = swing ? rS * 70 + f2 * 35 : 0, phiH = swing ? rH * 75 + f2 * 30 : 0; // 肩、髖的轉動
+  const ws = 0.15 + 0.75 * Math.abs(Math.cos((phiS * Math.PI) / 180));
+  const wh = 0.15 + 0.55 * Math.abs(Math.cos(((phiH * 0.7) * Math.PI) / 180));
+  const lean = -0.25 * ld + 0.3 * rH - 0.2 * f2 + (type === 'whiff' ? 0.4 * f2 : 0); // 揮空：重心被帶出去
+  const dip = type === 'whiff' ? 0.45 * f2 : 0;
+  const hip = { x: 0.35 * rH, z: 3.0 }; // 重心從後腳移到前腳
+  const sh = { x: hip.x * 0.6 + lean * 0.25, z: 4.9 - dip };
   const el = (side) => elbowOf({ x: sh.x + side * ws * 0.6, z: 4.8 - dip }, hands, 1);
-  return { hands, tip, ws, wh, kneeF: { x: 0.3 + 0.55 * ld + 0.2 * sw1 + 0.15, z: 1.6 }, kneeB: { x: -0.35, z: 1.5 - dip * 0.4 }, elbowF: el(1), elbowB: el(-1), handF: hands, handB: hands, head: { x: lean * 0.6, z: 5.8 - dip }, sh: { x: lean * 0.4, z: 4.9 }, hip: { x: 0, z: 3.0 }, footB: { x: -0.55 - 0.1 * sw1, z: 0 }, footF: { x: 0.45 + 0.55 * ld + 0.2 * sw1, z: 0 }, tipZ: tip.z };
+  const stride = 0.45 + 0.55 * ld + 0.2 * rH;
+  return {
+    hands, tip, ws, wh, hip, sh, handF: hands, handB: hands, elbowF: el(1), elbowB: el(-1),
+    head: { x: lean * 0.25 + 0.08 * rH, z: 5.8 - dip - 0.2 * rH }, // 頭盡量不動、眼睛盯著球
+    kneeF: { x: stride * 0.5 + 0.35, z: 1.6 }, kneeB: { x: -0.35 + 0.3 * rH, z: 1.5 - dip * 0.4 },
+    footF: { x: stride, z: 0.5 * ld * (1 - clamp(kk / 0.12, 0, 1)) }, // 蓄力時前腳稍微抬起，出棒時踩下
+    footB: { x: -0.55 - 0.15 * rH, z: 0.3 * rH }, // 後腳以前腳掌為軸，腳跟離地
+    tipZ: tip.z,
+  };
 }
 
 // 把一個打席排成時間表（秒）。prev 是同一個半局的上一個打席（用來知道一開始壘上有誰）。

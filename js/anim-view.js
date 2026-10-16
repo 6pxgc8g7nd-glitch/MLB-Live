@@ -158,8 +158,15 @@ export function openAnim(play, gd, allPlays, feed) {
       const p = batPose(f.bat.load, f.bat.k, f.bat.type, f.bat.z);
       const Wb = (x, z) => [dir * (x - 2.1) * bs, 0.7, z];
       const lnB = (A, B, w, col) => { const a1 = project(c, Wb(A.x, A.z)), b1 = project(c, Wb(B.x, B.z)); return a1 && b1 ? `<line x1="${f2(a1.x)}" y1="${f2(a1.y)}" x2="${f2(b1.x)}" y2="${f2(b1.y)}" stroke="${col}" stroke-width="${f2((w * c.F) / a1.d)}" stroke-linecap="round"/>` : ''; };
-      const ghosts = [3, 2, 1].map((g) => { if (f.bat.type === 'take' || f.bat.k < 0.12 || f.bat.k > 0.96) return ''; const q = batPose(f.bat.load, Math.max(0, f.bat.k - g * 0.07), f.bat.type, f.bat.z); return lnB(q.hands, q.tip, 0.09, `rgba(217,178,124,${(0.38 / g).toFixed(2)})`); }).join('');
-      out += `<g opacity="${al}">${figure(c, Wb, p, batColor, { dir, extra: ghosts + lnB(p.hands, p.tip, 0.11, '#d9b27c') })}</g>`;
+      // 揮棒的掃痕：把最近一小段時間棒頭走過的範圍畫成淡淡的扇形，加上棒頭的軌跡線
+      const sweep = (() => {
+        if (f.bat.type === 'take' || f.bat.k < 0.08 || f.bat.k > 0.97) return '';
+        const tips = [], n = 7;
+        for (let i = 0; i <= n; i++) { const q = batPose(f.bat.load, Math.max(0, f.bat.k - 0.22 * (1 - i / n)), f.bat.type, f.bat.z); tips.push(Wb(q.tip.x, q.tip.z)); }
+        const hs = Wb(p.hands.x, p.hands.z), pts = projectPoly(c, [hs, ...tips], true), tl = projectPoly(c, tips, false);
+        return (pts.length > 2 ? `<polygon points="${pts.map(P).join(' ')}" fill="rgba(255,255,255,.17)"/>` : '') + (tl.length > 1 ? `<polyline points="${tl.map(P).join(' ')}" fill="none" stroke="rgba(255,236,170,.65)" stroke-width="2.5" stroke-linecap="round" vector-effect="non-scaling-stroke"/>` : '');
+      })();
+      out += `<g opacity="${al}">${figure(c, Wb, p, batColor, { dir, extra: sweep + lnB(p.hands, p.tip, 0.11, '#d9b27c') })}</g>`;
       // 投手：站在投手丘上，每球出手前抬腿、揮臂，出手瞬間球離手
       const pp = pitcherPose(f.pit, pitDir);
       const Wp = (x, z) => [x, 58.4, z + 0.5];
