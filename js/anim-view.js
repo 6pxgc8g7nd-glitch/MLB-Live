@@ -4,9 +4,10 @@ import { evZh } from './dict.js';
 import { S } from './state.js';
 import { PITCH_ZH } from './pitches.js';
 import { IC } from './icons.js';
+import { teamAbbr } from './dict.js';
 import { pitchGroup } from './pitchmap.js';
 import { PLATE_Y, camAt, project, projectPoly, GROUND } from './cam3d.js';
-import { BASE_XY, FIELD_POS as POS, MOUND_Y, buildScript, frameAt, batPose, clamp } from './anim-script.js';
+import { BASE_XY, FIELD_POS as POS, MOUND_Y, buildScript, frameAt, batPose, clamp, scorebug } from './anim-script.js';
 /* ───────── 畫面 ───────── */
 const ZH = () => S.lang !== 'en';
 const L = (zh, en) => (ZH() ? zh : en);
@@ -29,7 +30,7 @@ const fieldSVG = () => `<g transform="scale(1,-1)">
 
 // 捕手後方視角的靜態場景（座標單位：本壘板前緣處的 1 呎）
 const f2 = (n) => n.toFixed(3);
-export function openAnim(play, gd, allPlays) {
+export function openAnim(play, gd, allPlays, feed) {
   if (!play || document.getElementById('an')) return null;
   const prevPlay = allPlays && play.about ? [...allPlays].reverse().find((p) => p.about && p.about.atBatIndex === play.about.atBatIndex - 1) : null;
   const sc = buildScript(play, prevPlay);
@@ -47,6 +48,10 @@ export function openAnim(play, gd, allPlays) {
       <polyline id="anTr" class="an-tr" fill="none" vector-effect="non-scaling-stroke"/><polyline id="anTr2" class="an-tr2" fill="none" vector-effect="non-scaling-stroke"/>
       <g id="anFx"></g><g id="anRn"></g>
       <g id="anBall"><ellipse id="anSh" class="an-sh"/><circle id="anBc" class="an-bc"/></g></svg>
+      <div class="an-sb"><div class="sb-t"><div><span class="sb-a"></span><b></b></div><div><span class="sb-h"></span><b></b></div></div>
+        <svg class="sb-d" viewBox="0 0 34 30" aria-hidden="true"><rect class="b2" x="14" y="2" width="7" height="7" transform="rotate(45 17.5 5.5)"/><rect class="b3" x="3" y="12" width="7" height="7" transform="rotate(45 6.5 15.5)"/><rect class="b1" x="25" y="12" width="7" height="7" transform="rotate(45 28.5 15.5)"/></svg>
+        <div class="sb-r"><div class="sb-in"></div><div class="sb-ct"></div><div class="sb-o"><i></i><i></i><i></i></div></div></div>
+      <div class="an-lt"><div><i>${L('打', 'AB')}</i><b>${esc(bat)}</b><small class="lt-b"></small></div><div><i>${L('投', 'P')}</i><b>${esc(pit)}</b><small class="lt-p"></small></div></div>
       <div class="an-hud" hidden></div>
       <div class="an-cap"><div class="an-cl"></div><div class="an-ct"></div></div>
       <div class="an-bn" hidden><b></b><small></small></div></div>
@@ -55,6 +60,18 @@ export function openAnim(play, gd, allPlays) {
   document.body.appendChild(el);
   const $e = (s) => el.querySelector(s);
   const svg = $e('#anSvg'), pv = $e('#anPv'), st = $e('.an-st');
+  let sbSig = '';
+  { // 比分條上的球隊簡稱、名牌上的打擊率與防禦率（資料來自這場比賽的 boxscore，沒有就不顯示）
+    const away = gd && gd.teams && gd.teams.away, home = gd && gd.teams && gd.teams.home;
+    $e('.sb-a').textContent = teamAbbr(away) || 'AWAY'; $e('.sb-h').textContent = teamAbbr(home) || 'HOME';
+    const bs = feed && feed.liveData && feed.liveData.boxscore && feed.liveData.boxscore.teams;
+    const find = (id) => { for (const sd of ['away', 'home']) { const p = bs && bs[sd] && bs[sd].players && bs[sd].players['ID' + id]; if (p) return p; } return null; };
+    const bp = find(m.batter && m.batter.id), pp2 = find(m.pitcher && m.pitcher.id);
+    const HB = { R: L('右打', 'R'), L: L('左打', 'L'), S: L('左右開弓', 'S') }, HP = { R: L('右投', 'R'), L: L('左投', 'L') };
+    const avg = bp && bp.seasonStats && bp.seasonStats.batting && bp.seasonStats.batting.avg, era = pp2 && pp2.seasonStats && pp2.seasonStats.pitching && pp2.seasonStats.pitching.era;
+    $e('.lt-b').textContent = [HB[m.batSide && m.batSide.code], avg ? `AVG ${avg}` : ''].filter(Boolean).join('　');
+    $e('.lt-p').textContent = [HP[m.pitchHand && m.pitchHand.code], era ? `ERA ${era}` : ''].filter(Boolean).join('　');
+  }
   const dir = rightie ? 1 : -1;
   const opener = document.activeElement;
   let t = 0, speed = 1, raf = 0, last = 0, rm = 0;
@@ -189,6 +206,20 @@ export function openAnim(play, gd, allPlays) {
       hudEl.hidden = false;
     } else hudEl.hidden = true;
     $e('.an-bn').hidden = !f.banner;
+    // 電視轉播的比分條與球員名牌
+    const b = scorebug(play, prevPlay, f), sig = JSON.stringify(b);
+    if (sig !== sbSig) {
+      sbSig = sig;
+      const nb = el.querySelectorAll('.sb-t b');
+      nb[0].textContent = b.away; nb[1].textContent = b.home;
+      $e('.sb-in').textContent = L(`${b.inning}局${b.half === 'top' ? '上' : '下'}`, `${b.half === 'top' ? 'Top' : 'Bot'} ${b.inning}`);
+      $e('.sb-ct').textContent = `${b.balls}-${b.strikes}`;
+      el.querySelectorAll('.sb-o i').forEach((d, i) => d.classList.toggle('on', i < b.outs));
+      ['b1', 'b2', 'b3'].forEach((k, i) => $e('.sb-d .' + k).classList.toggle('on', b.bases[i]));
+      $e('.an-sb').classList.toggle('pop', b.scored);
+    }
+    const lt = $e('.an-lt'), ink = clamp((f.t - 0.3) / 0.35, 0, 1), outk = clamp((3.2 - f.t) / 0.35, 0, 1), vis = Math.min(ink, outk);
+    lt.style.opacity = vis.toFixed(2); lt.style.transform = `translateX(${((1 - vis) * -30).toFixed(1)}px)`; lt.style.visibility = vis > 0 ? 'visible' : 'hidden';
   };
   // 播放控制：播放／暫停、時間軸、上一球／下一球。拖時間軸、按上下一球都會先暫停
   const rg = $e('.an-rg'), tm = $e('.an-tm'), pp = $e('.an-pp');

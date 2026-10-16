@@ -370,5 +370,28 @@ export function frameAt(sc, t) {
     const z = sc.zone.find((q) => q.t === cap.t1);
     contact = { k: (t - cap.t1) / 0.45, x: z ? z.x : 0, z: z ? z.z : 2.6, strength: clamp(((cap.ev || 85) - 60) / 50, 0.25, 1) * (cap.cls === 'f' ? 0.6 : 1), foul: cap.cls === 'f' };
   }
-  return { contact, scene, m, endCam: isHit ? hs.cam0 : null, cam, ball, trail, trailCls, trail2, cap, evcap, zone, impact, bat, hud, runners, fielders, fx, banner: t >= sc.bannerT, hr: sc.hr };
+  return { t, contact, scene, m, endCam: isHit ? hs.cam0 : null, cam, ball, trail, trailCls, trail2, cap, evcap, zone, impact, bat, hud, runners, fielders, fx, banner: t >= sc.bannerT, hr: sc.hr };
+}
+
+// 電視轉播的比分條：比分、局數、出局數、壘上有人、目前球數。
+// 打席進行中顯示打席開始前的狀態，結果出來（banner）之後換成打席結束後的狀態（得分、出局數會跳動）
+export function scorebug(play, prev, f) {
+  const r = (play && play.result) || {}, pr = (prev && prev.result) || {};
+  const pre = [pr.awayScore != null ? pr.awayScore : 0, pr.homeScore != null ? pr.homeScore : 0];
+  const post = [r.awayScore != null ? r.awayScore : pre[0], r.homeScore != null ? r.homeScore : pre[1]];
+  const made = ((play && play.runners) || []).filter((x) => x.movement && x.movement.isOut).length;
+  const outsPost = clamp((play && play.count && play.count.outs) || 0, 0, 3);
+  const outsPre = clamp(outsPost - made, 0, 2);
+  const done = !!f.banner;
+  const sc = done ? post : pre;
+  const cap = f.cap;
+  const cnt = cap ? (cap.done ? cap.count : cap.prevCount) : null;
+  const near = (b) => f.runners.some((q) => Math.hypot(q.x - BASE_XY[b][0], q.y - BASE_XY[b][1]) < 9);
+  return {
+    away: sc[0], home: sc[1], scored: done && (post[0] !== pre[0] || post[1] !== pre[1]),
+    outs: done ? Math.min(outsPost, 3) : outsPre,
+    inning: (play && play.about && play.about.inning) || 0, half: play && play.about && play.about.halfInning === 'bottom' ? 'bottom' : 'top',
+    balls: cnt ? cnt.balls : 0, strikes: cnt ? cnt.strikes : 0,
+    bases: [near('1B'), near('2B'), near('3B')],
+  };
 }

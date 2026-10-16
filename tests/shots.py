@@ -306,6 +306,9 @@ with sync_playwright() as p:
                 if not info: failures.append((name, ['點動畫鈕沒有開出動畫']))
                 else:
                     o = info['out']
+                    sb = pg.evaluate("[document.querySelector('.an-sb').innerText.replace(/\\s+/g, ' '), getComputedStyle(document.querySelector('.an-lt')).visibility]")
+                    print('scorebug:', sb)
+                    if 'CLE' not in sb[0] and 'CWS' not in sb[0]: failures.append((name, ['動畫的比分條沒有球隊簡稱：%s' % sb]))
                     if o[0][0] != '1' or o[2][1] != '1' or o[3][1] != '1' or o[0][2] < 2000 or not info['hud'] or not info['banner']:
                         failures.append((name, ['動畫畫面不正常：%s' % info]))
                     # 播放控制：暫停、下一球／上一球、時間軸，動作後都要停住並且時間正確

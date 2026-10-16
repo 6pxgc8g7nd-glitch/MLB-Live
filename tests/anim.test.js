@@ -2,7 +2,7 @@
  * 檢查：每個打席、每個時間點的畫面狀態都是有限數字；幾種代表性打席（全壘打、滾地球傳殺、雙殺、盜壘、保送、接殺、三振）的動畫行為。 */
 import assert from 'node:assert';
 import fs from 'node:fs';
-import { buildScript, frameAt } from '../js/anim.js';
+import { buildScript, frameAt, scorebug } from '../js/anim.js';
 
 const plays = JSON.parse(fs.readFileSync(new URL('./fixtures/plays-599371.json', import.meta.url))).allPlays;
 const by = new Map(plays.map((p) => [p.about.atBatIndex, p]));
@@ -92,6 +92,22 @@ assert.ok(frames > 3000, '至少掃了幾千格');
 {
   const sc = script(7);
   assert.ok(sc.evcaps.some((e) => e.text === '盜二壘成功') && !sc.evcaps.some((e) => e.text === '三振'));
+}
+
+// 9) 電視轉播比分條：打席進行中是打席開始前的狀態，結果出來後才換成打席後的狀態
+{
+  const sbAt = (n, t) => { const p = by.get(n), sc = buildScript(p, by.get(n - 1)); return scorebug(p, by.get(n - 1), frameAt(sc, t)); };
+  const hr = script(12);
+  const a = sbAt(12, 1), z = sbAt(12, hr.total);
+  assert.deepStrictEqual([a.away, a.home, a.outs, a.inning, a.half], [0, 2, 2, 2, 'top'], '全壘打前：客隊 0、主隊 2、兩出局、2 局上');
+  assert.deepStrictEqual([z.away, z.home, z.scored], [1, 2, true], '全壘打後客隊 +1，並標示得分');
+  assert.deepStrictEqual([a.balls, a.strikes], [0, 0], '第一球之前球數 0-0');
+  assert.ok(sbAt(12, hr.segs.find((s) => s.kind === 'pitch').t1 + 0.1).balls === 1 || sbAt(12, hr.segs.find((s) => s.kind === 'pitch').t1 + 0.1).strikes === 0);
+  const dp = sbAt(47, 0), dpEnd = sbAt(47, script(47).total);
+  assert.deepStrictEqual([dp.bases.filter(Boolean).length, dp.outs, dpEnd.outs], [1, 0, 2], '雙殺：開始時一壘有人、無人出局；結束時兩人出局');
+  assert.deepStrictEqual(dpEnd.bases, [false, false, false], '雙殺後壘上沒人');
+  const st = sbAt(1, 0), stEnd = sbAt(1, script(1).total);
+  assert.deepStrictEqual([st.bases, stEnd.bases[1]], [[true, false, false], true], '盜壘：一壘有人，之後跑到二壘');
 }
 
 console.log('animation tests passed (' + frames + ' frames)');
