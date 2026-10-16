@@ -5,14 +5,14 @@ import { evZh, seriesZh } from '../js/dict.js';
 import { gameState, cardHTML } from '../js/scores.js';
 import { windZh, weatherZh, preGameHTML } from '../js/preview.js';
 import { camAt, project, projectPoly } from '../js/cam3d.js';
-import { pitchPath, hitPlan, hitPos, runnerMoves, buildScript, frameAt, persp, wallR, DP, batPose } from '../js/anim.js';
+import { pitchPath, hitPlan, hitPos, runnerMoves, buildScript, frameAt, persp, wallR, DP, batPose, pitcherPose } from '../js/anim.js';
 import { pitcherPitches, pitchTypeStats, pitcherMapHTML } from '../js/pitchmap.js';
 import { headHTML, textHTML, boxHTML, liveHTML, recapTarget } from '../js/game.js';
 import { standingsHTML, bracketHTML, lastNoon, nextNoon, isFreshDaily } from '../js/standings.js';
 import { pollWait, nextWait, createPoller } from '../js/api.js';
 import { S, setG } from '../js/state.js';
 import { pLink, pickStat, playerCardHTML, teamInGame } from '../js/player.js';
-import { logo } from '../js/dict.js';
+import { logo, teamColor, TEAMS } from '../js/dict.js';
 import { wpPoints, wpHTML } from '../js/winprob.js';
 import { tcToMs, stampAt, halfStarts, barLabel } from '../js/replay.js';
 
@@ -535,6 +535,22 @@ console.log('all tests passed');
   assert.ok(wf.head.z < ct2.head.z - 0.3 && wf.head.x > ct2.head.x, '揮空後頭壓低、重心前傾');
   const cap2 = sc.caps[1];
   assert.strictEqual(frameAt(sc, cap2.t1).bat.type, 'contact'); assert.ok(Math.abs(frameAt(sc, cap2.t1).bat.k - 0.5) < 0.01, '球到本壘的瞬間正好是揮棒的 0.5');
+  // 打者與投手的人形：姿勢、膝與肘、球衣顏色
+  const rest = pitcherPose(-1, -1), cock = pitcherPose(-0.35, -1), rel = pitcherPose(0, -1), fol = pitcherPose(0.8, -1), lh = pitcherPose(0, 1);
+  assert.ok(rest.handF.z < 5 && rest.footF.z === 0, '準備：雙手在胸前、雙腳著地');
+  assert.ok(cock.footF.z < 0.5 || pitcherPose(-0.6, -1).footF.z > 1.2, '蓄力途中前腳抬起');
+  assert.ok(pitcherPose(-0.6, -1).kneeF.z > rest.kneeF.z + 0.6, '抬腿時膝蓋升高');
+  assert.ok(rel.handF.z > 6.3 && rel.handF.x < 0, '右投出手：手在最高點，在捕手視角的左側');
+  assert.ok(lh.handF.x > 0, '左投：投球手在右側');
+  assert.ok(fol.handF.z < rel.handF.z - 3 && fol.handF.x > 0 && fol.head.z < rest.head.z - 0.8, '收尾：手劃過身體落下、身體前傾');
+  for (const q of [rest, cock, rel, fol, batPose(0.5, 0.3, 'contact', 2.5), batPose(1, 0.8, 'whiff', 2)]) {
+    for (const k of ['hip', 'kneeF', 'kneeB', 'footF', 'footB', 'sh', 'elbowF', 'elbowB', 'handF', 'handB', 'head']) assert.ok(q[k] && Number.isFinite(q[k].x) && Number.isFinite(q[k].z), '姿勢的關節座標是有限數字：' + k);
+    assert.ok(q.kneeF.z <= q.hip.z + 0.4 && q.kneeB.z < q.hip.z && q.elbowB.z < q.sh.z + 1.2, '膝蓋最高抬到髖的高度，後腳膝蓋在髖下面');
+  }
+  assert.strictEqual(frameAt(sc, sc.caps[0].t0).pit, 0, '出手的瞬間 ph = 0');
+  assert.strictEqual(frameAt(sc, sc.caps[0].t0 - 0.45).pit, -1);
+  assert.ok(frameAt(sc, sc.caps[0].t0 + 1.0).pit === -1 || frameAt(sc, sc.caps[0].t0 + 1.0).pit > 0, '收尾之後回到準備');
+  assert.ok(Object.keys(TEAMS).every((id) => /^#[0-9A-F]{6}$/i.test(teamColor({ id: Number(id) }))) && teamColor(null) === '#3b4f66', '30 隊都有球衣顏色');
   assert.strictEqual(frameAt(sc, 0).hud, null);
   const hudF = frameAt(sc, hitSeg.t0 + hitSeg.hp.dur * 0.5).hud;
   assert.ok(hudF && hudF.ev === 98 && hudF.la === 20 && hudF.dist > 0 && hudF.dist < hudF.total && hudF.air, '飛行中雷達資料：初速、仰角、距離逐漸增加');

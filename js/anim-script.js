@@ -159,6 +159,37 @@ function fieldPlan(play, hp, tHit, tLand) {
   return { moves, legs, arrive: arr, end: tc };
 }
 
+// 手肘：肩到手之間用兩節手臂（各約 1.05 呎）夾出來，手肘朝下
+function elbowOf(S, H, down) {
+  const dx = H.x - S.x, dz = H.z - S.z, d = Math.hypot(dx, dz) || 1e-6, L = 1.05;
+  const h = Math.sqrt(Math.max(0.02, L * L - (d / 2) * (d / 2)));
+  let nx = -dz / d, nz = dx / d;
+  if (nz * down > 0) { nx = -nx; nz = -nz; } // 讓手肘往下掉
+  return { x: (S.x + H.x) / 2 + nx * h, z: (S.z + H.z) / 2 + nz * h };
+}
+const lerp2 = (a, b, k) => ({ x: a.x + (b.x - a.x) * k, z: a.z + (b.z - a.z) * k });
+
+// 投手的投球動作（單位：呎，x 以投手丘中心為 0、投球手那一側 hand=±1 為正，z 向上）。
+// ph：-1 準備（站在投手板）→ -0.35 抬腿蓄力完成 → 0 出手 → 0.8 收尾
+export function pitcherPose(ph, hand) {
+  const p = clamp(ph, -1, 1);
+  const wind = ease(clamp((p + 1) / 0.65, 0, 1)), strd = ease(clamp((p + 0.35) / 0.35, 0, 1)), fol = ease(clamp(p / 0.8, 0, 1));
+  const lift = wind * (1 - strd);
+  const path = (A, B, C, D) => (p < -0.35 ? lerp2(A, B, wind) : p < 0 ? lerp2(B, C, strd) : lerp2(C, D, fol));
+  const hand1 = path({ x: hand * 0.25, z: 4.3 }, { x: hand * 1.9, z: 5.5 }, { x: hand * 1.0, z: 6.7 }, { x: -hand * 0.9, z: 3.1 });
+  const glove = path({ x: -hand * 0.25, z: 4.3 }, { x: -hand * 0.7, z: 5.0 }, { x: -hand * 1.0, z: 4.4 }, { x: -hand * 0.4, z: 3.5 });
+  const hip = { x: 0, z: 3.0 - 0.45 * strd - 0.25 * fol };
+  const sh = { x: -hand * 0.1 * lift + hand * 0.15 * fol, z: 4.9 - 0.5 * strd - 0.6 * fol };
+  const ws = 0.75 - 0.2 * lift, wh = 0.55;
+  const el = (side, hnd) => elbowOf({ x: sh.x + side * ws * 0.6, z: sh.z - 0.1 }, hnd, 1);
+  return {
+    hip, sh, ws, wh, head: { x: sh.x * 0.6, z: sh.z + 0.9 }, handF: hand1, handB: glove,
+    elbowF: el(hand, hand1), elbowB: el(-hand, glove),
+    footB: { x: hand * 0.45, z: 0 }, footF: { x: -hand * (0.45 + 0.4 * strd), z: lift * 2.2 },
+    kneeB: { x: hand * 0.35, z: 1.5 - 0.3 * fol }, kneeF: { x: -hand * (0.5 + 0.2 * strd), z: 1.6 + lift * 1.5 },
+  };
+}
+
 // 打者的姿勢（單位：呎，x 以打者站的位置為 0、朝本壘為正，z 向上）。
 // load 0~1：舉棒蓄力＋跨步；k 0~1：揮棒進度（0.5 = 球棒到達球的位置）；type：contact / foul / whiff / take；z：球過本壘的高度
 export function batPose(load, k, type, z) {
@@ -183,7 +214,9 @@ export function batPose(load, k, type, z) {
   const wh = 0.15 + 0.55 * Math.abs(Math.cos(((phi * 0.7) * Math.PI) / 180));
   const lean = -0.25 * ld + 0.35 * sw1 - 0.25 * sw2 + (type === 'whiff' ? 0.4 * sw2 : 0); // 揮空：重心被帶出去
   const dip = type === 'whiff' ? 0.45 * sw2 : 0;
-  return { hands, tip, ws, wh, head: { x: lean * 0.6, z: 5.8 - dip }, sh: { x: lean * 0.4, z: 4.9 }, hip: { x: 0, z: 3.0 }, footB: { x: -0.55 - 0.1 * sw1, z: 0 }, footF: { x: 0.45 + 0.55 * ld + 0.2 * sw1, z: 0 }, tipZ: tip.z };
+  const sh = { x: lean * 0.4, z: 4.9 - dip };
+  const el = (side) => elbowOf({ x: sh.x + side * ws * 0.6, z: 4.8 - dip }, hands, 1);
+  return { hands, tip, ws, wh, kneeF: { x: 0.3 + 0.55 * ld + 0.2 * sw1 + 0.15, z: 1.6 }, kneeB: { x: -0.35, z: 1.5 - dip * 0.4 }, elbowF: el(1), elbowB: el(-1), handF: hands, handB: hands, head: { x: lean * 0.6, z: 5.8 - dip }, sh: { x: lean * 0.4, z: 4.9 }, hip: { x: 0, z: 3.0 }, footB: { x: -0.55 - 0.1 * sw1, z: 0 }, footF: { x: 0.45 + 0.55 * ld + 0.2 * sw1, z: 0 }, tipZ: tip.z };
 }
 
 // 把一個打席排成時間表（秒）。prev 是同一個半局的上一個打席（用來知道一開始壘上有誰）。
@@ -370,7 +403,10 @@ export function frameAt(sc, t) {
     const z = sc.zone.find((q) => q.t === cap.t1);
     contact = { k: (t - cap.t1) / 0.45, x: z ? z.x : 0, z: z ? z.z : 2.6, strength: clamp(((cap.ev || 85) - 60) / 50, 0.25, 1) * (cap.cls === 'f' ? 0.6 : 1), foul: cap.cls === 'f' };
   }
-  return { t, contact, scene, m, endCam: isHit ? hs.cam0 : null, cam, ball, trail, trailCls, trail2, cap, evcap, zone, impact, bat, hud, runners, fielders, fx, banner: t >= sc.bannerT, hr: sc.hr };
+  // 投手動作：每球出手前 0.45 秒開始（抬腿、揮臂），出手那一刻球從手上飛出，之後 0.35 秒收尾
+  let pit = -1;
+  for (const c of sc.caps) { if (t >= c.t0 - 0.45 && t <= c.t0 + 0.35) { pit = (t - c.t0) / 0.45; break; } }
+  return { t, pit, contact, scene, m, endCam: isHit ? hs.cam0 : null, cam, ball, trail, trailCls, trail2, cap, evcap, zone, impact, bat, hud, runners, fielders, fx, banner: t >= sc.bannerT, hr: sc.hr };
 }
 
 // 電視轉播的比分條：比分、局數、出局數、壘上有人、目前球數。

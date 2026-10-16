@@ -26,6 +26,7 @@ for (const p of plays) {
     if (f.cam) nums.push(f.cam.cx, f.cam.y0, f.cam.y1, f.cam.minW);
     f.runners.forEach((r) => nums.push(r.x, r.y));
     f.fielders.forEach((q) => nums.push(q.x, q.y));
+    assert.ok(Number.isFinite(f.pit) && f.pit >= -1 && f.pit <= 0.8);
     assert.ok(nums.every(Number.isFinite), `打席 ${p.about.atBatIndex} t=${t.toFixed(2)} 出現非數字`);
   }
 }
