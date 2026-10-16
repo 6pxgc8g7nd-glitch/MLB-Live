@@ -95,6 +95,7 @@ export const persp = (x, y, z) => { const s = DP / (y + DCAM); return { x: x * s
 // 全壘打牆離本壘的距離（依方向，左右外野線約 330 呎、中外野約 410 呎，與畫面上的牆一致）
 export const wallR = (x, y) => { const th = Math.abs((Math.atan2(x, y) * 180) / Math.PI); return 410 - 81 * Math.pow(Math.min(th, 45) / 45, 2); };
 
+export const WIND = 0.6; // 投手從開始動作到出手的秒數
 const TR = 0.9; // 擊出後，鏡頭從捕手視角拉高、拉遠成俯視所需的秒數
 const FIELD_CAM = { cx: 0, y0: -50, y1: 170, minW: 230 };
 const hitCam = (hp) => {
@@ -167,7 +168,6 @@ function elbowOf(S, H, down) {
   if (nz * down > 0) { nx = -nx; nz = -nz; } // 讓手肘往下掉
   return { x: (S.x + H.x) / 2 + nx * h, z: (S.z + H.z) / 2 + nz * h };
 }
-const lerp2 = (a, b, k) => ({ x: a.x + (b.x - a.x) * k, z: a.z + (b.z - a.z) * k });
 
 // 投手的投球動作（單位：呎，x 以投手丘中心為 0、投球手那一側 hand=±1 為正，z 向上）。
 // ph：-1 準備（站在投手板）→ -0.35 抬腿蓄力完成 → 0 出手 → 0.8 收尾
@@ -175,18 +175,24 @@ export function pitcherPose(ph, hand) {
   const p = clamp(ph, -1, 1);
   const wind = ease(clamp((p + 1) / 0.65, 0, 1)), strd = ease(clamp((p + 0.35) / 0.35, 0, 1)), fol = ease(clamp(p / 0.8, 0, 1));
   const lift = wind * (1 - strd);
-  const path = (A, B, C, D) => (p < -0.35 ? lerp2(A, B, wind) : p < 0 ? lerp2(B, C, strd) : lerp2(C, D, fol));
-  const hand1 = path({ x: hand * 0.25, z: 4.3 }, { x: hand * 1.9, z: 5.5 }, { x: hand * 1.0, z: 6.7 }, { x: -hand * 0.9, z: 3.1 });
-  const glove = path({ x: -hand * 0.25, z: 4.3 }, { x: -hand * 0.7, z: 5.0 }, { x: -hand * 1.0, z: 4.4 }, { x: -hand * 0.4, z: 3.5 });
-  const hip = { x: 0, z: 3.0 - 0.45 * strd - 0.25 * fol };
-  const sh = { x: -hand * 0.1 * lift + hand * 0.15 * fol, z: 4.9 - 0.5 * strd - 0.6 * fol };
-  const ws = 0.75 - 0.2 * lift, wh = 0.55;
-  const el = (side, hnd) => elbowOf({ x: sh.x + side * ws * 0.6, z: sh.z - 0.1 }, hnd, 1);
+  const hOpen = ease(clamp((p + 0.55) / 0.55, 0, 1)), sOpen = ease(clamp((p + 0.4) / 0.4, 0, 1)); // 髖先打開、肩膀慢一點，出手時胸口正對本壘
+  // 手與手套的路徑（x, z, y）：y 是往本壘方向走了幾呎。投球手：胸前 → 往後舉到高處 → 出手 → 收尾橫過身體
+  const path = (A, B, C, D) => {
+    const m = p < -0.35 ? [A, B, wind] : p < 0 ? [B, C, strd] : [C, D, fol];
+    return { x: m[0].x + (m[1].x - m[0].x) * m[2], z: m[0].z + (m[1].z - m[0].z) * m[2], y: m[0].y + (m[1].y - m[0].y) * m[2] };
+  };
+  const hand1 = path({ x: hand * 0.25, z: 4.3, y: 0 }, { x: hand * 1.9, z: 5.5, y: -0.6 }, { x: hand * 1.0, z: 6.7, y: 3.6 }, { x: -hand * 0.9, z: 3.1, y: 4.6 });
+  const glove = path({ x: -hand * 0.25, z: 4.3, y: 0 }, { x: -hand * 0.7, z: 5.0, y: 1.2 }, { x: -hand * 1.0, z: 4.4, y: 2.2 }, { x: -hand * 0.4, z: 3.5, y: 1.2 });
+  const hip = { x: 0, z: 3.0 - 0.45 * strd - 0.25 * fol, y: 3.0 * strd + 0.5 * fol }; // 跨步時身體往本壘移動
+  const sh = { x: -hand * 0.1 * lift + hand * 0.15 * fol, z: 4.9 - 0.5 * strd - 0.6 * fol, y: hip.y + 0.5 * strd };
+  const ws = 0.35 + 0.45 * sOpen, wh = 0.3 + 0.3 * hOpen;
+  const el = (side, hnd) => { const e = elbowOf({ x: sh.x + side * ws * 0.6, z: sh.z - 0.1 }, hnd, 1); e.y = (sh.y + hnd.y) / 2; return e; };
   return {
-    hip, sh, ws, wh, head: { x: sh.x * 0.6, z: sh.z + 0.9 }, handF: hand1, handB: glove,
+    hip, sh, ws, wh, head: { x: sh.x * 0.6, z: sh.z + 0.9, y: sh.y + 0.3 }, handF: hand1, handB: glove,
     elbowF: el(hand, hand1), elbowB: el(-hand, glove),
-    footB: { x: hand * 0.45, z: 0 }, footF: { x: -hand * (0.45 + 0.4 * strd), z: lift * 2.2 },
-    kneeB: { x: hand * 0.35, z: 1.5 - 0.3 * fol }, kneeF: { x: -hand * (0.5 + 0.2 * strd), z: 1.6 + lift * 1.5 },
+    footB: { x: hand * 0.45, z: 0.35 * fol, y: 1.3 * fol }, // 後腳留在投手板上，出手後才被帶上來、腳跟抬起
+    footF: { x: -hand * (0.45 + 0.4 * strd), z: lift * 2.2, y: 6.0 * strd }, // 前腳抬起後往本壘跨出約 6 呎
+    kneeB: { x: hand * 0.35, z: 1.5 - 0.3 * fol, y: 0.5 * hip.y }, kneeF: { x: -hand * (0.5 + 0.2 * strd), z: 1.6 + lift * 1.5, y: 3.4 * strd + 0.4 * lift },
   };
 }
 
@@ -256,7 +262,7 @@ export function batPose(load, k, type, z) {
 export function buildScript(play, prev) {
   const evAll = ((play && play.playEvents) || []).filter(Boolean);
   const segs = [], caps = [], zone = [], evcaps = [], ents = new Map();
-  let t = 0.5, hitStart = null, hitDur = 0, hrCross = null, zTop = null, zBot = null, endT = 0, plan = null;
+  let t = 0.7, hitStart = null, hitDur = 0, hrCross = null, zTop = null, zBot = null, endT = 0, plan = null;
   const isHR = !!(play && play.result && play.result.event === 'Home Run');
   const idxOf = (e, k) => (e.index != null ? e.index : k);
   const idxSet = new Set(evAll.map(idxOf));
@@ -436,9 +442,9 @@ export function frameAt(sc, t) {
     const z = sc.zone.find((q) => q.t === cap.t1);
     contact = { k: (t - cap.t1) / 0.45, x: z ? z.x : 0, z: z ? z.z : 2.6, strength: clamp(((cap.ev || 85) - 60) / 50, 0.25, 1) * (cap.cls === 'f' ? 0.6 : 1), foul: cap.cls === 'f' };
   }
-  // 投手動作：每球出手前 0.45 秒開始（抬腿、揮臂），出手那一刻球從手上飛出，之後 0.35 秒收尾
+  // 投手動作：每球出手前 0.6 秒開始（抬腿、跨步、揮臂），出手那一刻球從手上飛出，之後 0.45 秒收尾
   let pit = -1;
-  for (const c of sc.caps) { if (t >= c.t0 - 0.45 && t <= c.t0 + 0.35) { pit = (t - c.t0) / 0.45; break; } }
+  for (const c of sc.caps) { if (t >= c.t0 - WIND && t <= c.t0 + 0.45) { pit = (t - c.t0) / WIND; break; } }
   return { t, pit, contact, scene, m, endCam: isHit ? hs.cam0 : null, cam, ball, trail, trailCls, trail2, cap, evcap, zone, impact, bat, hud, runners, fielders, fx, banner: t >= sc.bannerT, hr: sc.hr };
 }
 

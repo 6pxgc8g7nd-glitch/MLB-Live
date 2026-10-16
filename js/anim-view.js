@@ -90,20 +90,20 @@ export function openAnim(play, gd, allPlays, feed) {
   // 球員身體：腿（兩節）、球衣、手臂（兩節）、頭與帽盔，依姿勢逐格重畫。W 把（x, z）換成世界座標；jersey 是球衣顏色
   const SKIN = '#d9a47a', PANTS = '#e4e8ee', EDGE = 'rgba(255,255,255,.55)';
   const figure = (c, W, p, jersey, o) => {
-    const P2 = (q) => project(c, W(q.x, q.z));
+    const P2 = (q) => project(c, W(q.x, q.z, q.y));
     const sc0 = P2(p.hip);
     if (!sc0) return '';
     const u = c.F / sc0.d; // 1 呎在畫面上的大小
     const L = (a, b, w, col) => { const A = P2(a), B = P2(b); return A && B ? `<line x1="${f2(A.x)}" y1="${f2(A.y)}" x2="${f2(B.x)}" y2="${f2(B.y)}" stroke="${col}" stroke-width="${f2(w * u)}" stroke-linecap="round"/>` : ''; };
     const shoe = (q) => { const A = P2(q); return A ? `<ellipse cx="${f2(A.x + (o.dir || 1) * 0.12 * u)}" cy="${f2(A.y)}" rx="${f2(0.42 * u)}" ry="${f2(0.2 * u)}" fill="#111820"/>` : ''; };
     const PS = (q) => `${f2(q.x)},${f2(q.y)}`;
-    const poly = projectPoly(c, [W(p.sh.x - p.ws, 4.95), W(p.sh.x + p.ws, 4.95), W(p.hip.x + p.wh, 3.0), W(p.hip.x - p.wh, 3.0)], true);
+    const poly = projectPoly(c, [W(p.sh.x - p.ws, 4.95, p.sh.y), W(p.sh.x + p.ws, 4.95, p.sh.y), W(p.hip.x + p.wh, 3.0, p.hip.y), W(p.hip.x - p.wh, 3.0, p.hip.y)], true);
     const hd = P2(p.head);
     const r = 0.42 * u;
     let s = L(p.hip, p.kneeB, 0.5, PANTS) + L(p.kneeB, p.footB, 0.42, PANTS) + shoe(p.footB) + L(p.hip, p.kneeF, 0.5, PANTS) + L(p.kneeF, p.footF, 0.42, PANTS) + shoe(p.footF);
     s += L(p.elbowB, p.handB, 0.26, SKIN) + L(p.sh, p.elbowB, 0.34, jersey);
     if (poly.length > 2) s += `<polygon points="${poly.map(PS).join(' ')}" fill="${jersey}" stroke="${EDGE}" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
-    s += L({ x: p.hip.x - p.wh * 0.9, z: 3.05 }, { x: p.hip.x + p.wh * 0.9, z: 3.05 }, 0.14, '#1a1f26'); // 腰帶
+    s += L({ x: p.hip.x - p.wh * 0.9, z: 3.05, y: p.hip.y }, { x: p.hip.x + p.wh * 0.9, z: 3.05, y: p.hip.y }, 0.14, '#1a1f26'); // 腰帶
     s += L(p.elbowF, p.handF, 0.26, SKIN) + L(p.sh, p.elbowF, 0.34, jersey);
     if (hd) {
       const d1 = o.dir || 1;
@@ -169,9 +169,9 @@ export function openAnim(play, gd, allPlays, feed) {
       out += `<g opacity="${al}">${figure(c, Wb, p, batColor, { dir, extra: sweep + lnB(p.hands, p.tip, 0.11, '#d9b27c') })}</g>`;
       // 投手：站在投手丘上，每球出手前抬腿、揮臂，出手瞬間球離手
       const pp = pitcherPose(f.pit, pitDir);
-      const Wp = (x, z) => [x, 58.4, z + 0.5];
-      const rel = f.pit < 0 ? (() => { const hs = project(c, Wp(pp.handF.x, pp.handF.z)); return hs ? `<circle cx="${f2(hs.x)}" cy="${f2(hs.y)}" r="${f2(Math.max((0.2 * c.F) / hs.d, 1.6 * pxN))}" fill="#fff"/>` : ''; })() : '';
-      const gl = (() => { const gs = project(c, Wp(pp.handB.x, pp.handB.z)); return gs ? `<circle cx="${f2(gs.x)}" cy="${f2(gs.y)}" r="${f2((0.5 * c.F) / gs.d)}" fill="#7a4b24"/>` : ''; })();
+      const Wp = (x, z, y = 0) => [x, 59.4 - y, z + 0.8]; // 站在投手板上，y 是往本壘方向的距離
+      const rel = f.pit < 0 ? (() => { const hs = project(c, Wp(pp.handF.x, pp.handF.z, pp.handF.y)); return hs ? `<circle cx="${f2(hs.x)}" cy="${f2(hs.y)}" r="${f2(Math.max((0.2 * c.F) / hs.d, 1.6 * pxN))}" fill="#fff"/>` : ''; })() : '';
+      const gl = (() => { const gs = project(c, Wp(pp.handB.x, pp.handB.z, pp.handB.y)); return gs ? `<circle cx="${f2(gs.x)}" cy="${f2(gs.y)}" r="${f2((0.5 * c.F) / gs.d)}" fill="#7a4b24"/>` : ''; })();
       out += `<g opacity="${al}">${figure(c, Wp, pp, pitColor, { dir: 1, extra: gl + rel })}</g>`;
     }
     // 跑者

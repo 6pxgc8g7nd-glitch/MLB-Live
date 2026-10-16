@@ -550,13 +550,20 @@ console.log('all tests passed');
   assert.ok(pitcherPose(-0.6, -1).kneeF.z > rest.kneeF.z + 0.6, '抬腿時膝蓋升高');
   assert.ok(rel.handF.z > 6.3 && rel.handF.x < 0, '右投出手：手在最高點，在捕手視角的左側');
   assert.ok(lh.handF.x > 0, '左投：投球手在右側');
+  // 投球動作：跨步往本壘移動、胸口逐漸正對本壘、後腳被帶上來、手往本壘伸
+  assert.ok(rest.footF.y === 0 && rel.footF.y > 5.5, '前腳往本壘跨出約 6 呎');
+  assert.ok(rel.hip.y > 2.5 && rel.hip.y < fol.hip.y + 0.1 && fol.hip.y >= rel.hip.y, '身體隨跨步往本壘移動');
+  assert.ok(rest.ws < 0.5 && rel.ws > 0.7 && rest.wh < rel.wh, '準備時側身（窄），出手時胸口正對本壘（寬），髖比肩先打開');
+  assert.ok(fol.footB.z > 0.2 && fol.footB.y > 1 && rel.footB.z < 0.1, '出手後後腳被帶上來、腳跟抬起');
+  assert.ok(cock.handF.y < 0 && rel.handF.y > 3 && fol.handF.y > rel.handF.y, '投球手：往後舉，出手時伸向本壘，收尾更往前');
+  assert.ok(rel.handB.y > rest.handB.y + 1.5, '手套手伸向目標');
   assert.ok(fol.handF.z < rel.handF.z - 3 && fol.handF.x > 0 && fol.head.z < rest.head.z - 0.8, '收尾：手劃過身體落下、身體前傾');
   for (const q of [rest, cock, rel, fol, batPose(0.5, 0.3, 'contact', 2.5), batPose(1, 0.8, 'whiff', 2)]) {
     for (const k of ['hip', 'kneeF', 'kneeB', 'footF', 'footB', 'sh', 'elbowF', 'elbowB', 'handF', 'handB', 'head']) assert.ok(q[k] && Number.isFinite(q[k].x) && Number.isFinite(q[k].z), '姿勢的關節座標是有限數字：' + k);
     assert.ok(q.kneeF.z <= q.hip.z + 0.4 && q.kneeB.z < q.hip.z && q.elbowB.z < q.sh.z + 1.2, '膝蓋最高抬到髖的高度，後腳膝蓋在髖下面');
   }
   assert.strictEqual(frameAt(sc, sc.caps[0].t0).pit, 0, '出手的瞬間 ph = 0');
-  assert.strictEqual(frameAt(sc, sc.caps[0].t0 - 0.45).pit, -1);
+  assert.strictEqual(frameAt(sc, sc.caps[0].t0 - 0.6).pit, -1);
   assert.ok(frameAt(sc, sc.caps[0].t0 + 1.0).pit === -1 || frameAt(sc, sc.caps[0].t0 + 1.0).pit > 0, '收尾之後回到準備');
   assert.ok(Object.keys(TEAMS).every((id) => /^#[0-9A-F]{6}$/i.test(teamColor({ id: Number(id) }))) && teamColor(null) === '#3b4f66', '30 隊都有球衣顏色');
   // 野手、跑者、捕手的人形姿勢
