@@ -7,7 +7,7 @@ import { IC } from './icons.js';
 import { teamAbbr, teamColor } from './dict.js';
 import { pitchGroup } from './pitchmap.js';
 import { PLATE_Y, camAt, project, projectPoly, GROUND } from './cam3d.js';
-import { BASE_XY, FIELD_POS as POS, MOUND_Y, buildScript, frameAt, batPose, pitcherPose, clamp, scorebug } from './anim-script.js';
+import { BASE_XY, FIELD_POS as POS, MOUND_Y, buildScript, frameAt, batPose, pitcherPose, standPose, runPose, crouchPose, clamp, scorebug } from './anim-script.js';
 /* ───────── 畫面 ───────── */
 const ZH = () => S.lang !== 'en';
 const L = (zh, en) => (ZH() ? zh : en);
@@ -142,9 +142,14 @@ export function openAnim(play, gd, allPlays, feed) {
     const sorted = f.fielders.map((q) => ({ q, s: project(c, [q.x, q.y, 0]) })).filter((o) => o.s && o.s.d > 4).sort((u, v) => v.s.d - u.s.d);
     for (const { q, s } of sorted) {
       if (q.pos === 'P' && k < 0.7) continue; // 投手改畫成有動作的人（下面）
+      const fig = fade > 0.02 && s.d < 130; // 近的畫成穿球衣的人，遠的與拉遠後縮成圓點（跟平面球場一致）
       const top = project(c, [q.x, q.y, 5.6 * (1 - k) + 0.3]);
       const r = (0.45 * c.F / s.d) * (1 - k) + (q.act ? 5 : 4) * pxN * k;
-      if (top && fade > 0.02) out += `<line x1="${f2(s.x)}" y1="${f2(s.y)}" x2="${f2(top.x)}" y2="${f2(top.y)}" stroke="#1c3a66" stroke-width="${f2((1.3 * c.F) / s.d)}" stroke-linecap="round" opacity="${f2(fade)}"/>`;
+      if (fig) {
+        const pose = q.act ? runPose(f.t * 7 + q.x * 0.05) : q.pos === 'C' ? crouchPose() : standPose();
+        out += `<g opacity="${f2(fade)}">${figure(c, (x, z) => [q.x + x, q.y, z], pose, pitColor, { dir: 1 })}</g>`;
+        if (k < 0.35) continue;
+      } else if (top && fade > 0.02) out += `<line x1="${f2(s.x)}" y1="${f2(s.y)}" x2="${f2(top.x)}" y2="${f2(top.y)}" stroke="#1c3a66" stroke-width="${f2((1.3 * c.F) / s.d)}" stroke-linecap="round" opacity="${f2(fade)}"/>`;
       out += `<circle cx="${f2((top || s).x)}" cy="${f2((top || s).y)}" r="${f2(r)}" fill="${q.act ? '#f2c94c' : '#1c3a66'}" stroke="#fff" stroke-width="1" vector-effect="non-scaling-stroke"/>`;
     }
     // 打者與投手（轉場早期才看得到）：穿該隊球衣顏色
@@ -163,7 +168,14 @@ export function openAnim(play, gd, allPlays, feed) {
       out += `<g opacity="${al}">${figure(c, Wp, pp, pitColor, { dir: 1, extra: gl + rel })}</g>`;
     }
     // 跑者
-    for (const r of f.runners) out += dot([r.x, r.y, 0.8], 1.1, 5.5, `fill="${r.batter ? '#e8863a' : '#f2c94c'}" stroke="#fff" stroke-width="1.2" vector-effect="non-scaling-stroke"`);
+    for (const r of f.runners) {
+      const rs = project(c, [r.x, r.y, 0]);
+      if (rs && fade > 0.02 && rs.d < 130) {
+        out += `<g opacity="${f2(fade)}">${figure(c, (x, z) => [r.x + x, r.y, z], r.moving ? runPose(f.t * 8) : standPose(), batColor, { dir: 1 })}</g>`;
+        if (k < 0.35) continue;
+      }
+      out += dot([r.x, r.y, 0.8], 1.1, 5.5, `fill="${r.batter ? '#e8863a' : '#f2c94c'}" stroke="#fff" stroke-width="1.2" vector-effect="non-scaling-stroke"`);
+    }
     // 球的軌跡與球
     if (f.ball && f.m > -1 && (f.scene === 'pitch')) {
       const tp = projectPoly(c, f.trail.map((q) => [q.x, q.y, q.z]), false);

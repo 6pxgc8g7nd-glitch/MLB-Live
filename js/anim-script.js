@@ -190,6 +190,26 @@ export function pitcherPose(ph, hand) {
   };
 }
 
+// 用幾個關鍵點組出完整的人形姿勢：膝蓋取髖與腳的中點再往前一點，手肘由肩與手算出來
+function rig({ hip, sh, head, footF, footB, handF, handB, ws = 0.7, wh = 0.5, knee = 0.3 }) {
+  const kn = (f, k) => ({ x: (hip.x + f.x) / 2 + k, z: (hip.z + f.z) / 2 });
+  return {
+    hip, sh, head, ws, wh, footF, footB, handF, handB, kneeF: kn(footF, knee), kneeB: kn(footB, -knee * 0.3),
+    elbowF: elbowOf({ x: sh.x + ws * 0.6, z: sh.z - 0.1 }, handF, 1), elbowB: elbowOf({ x: sh.x - ws * 0.6, z: sh.z - 0.1 }, handB, 1),
+  };
+}
+// 野手的準備姿勢（微蹲、雙手放在膝蓋上方）、跑步（ph 是跑步的相位，雙腿與雙臂反向擺動）、捕手蹲下
+export const standPose = () => rig({ hip: { x: 0, z: 2.75 }, sh: { x: 0.05, z: 4.45 }, head: { x: 0.1, z: 5.3 }, footF: { x: 0.45, z: 0 }, footB: { x: -0.45, z: 0 }, handF: { x: 0.5, z: 3.2 }, handB: { x: -0.5, z: 3.2 }, knee: 0.25 });
+export function runPose(ph) {
+  const a = Math.sin(ph), b = Math.cos(ph);
+  return rig({
+    hip: { x: 0, z: 2.95 + 0.08 * Math.abs(b) }, sh: { x: 0.1, z: 4.85 }, head: { x: 0.2, z: 5.75 },
+    footF: { x: 0.95 * a, z: Math.max(0, 0.9 * b) }, footB: { x: -0.95 * a, z: Math.max(0, -0.9 * b) },
+    handF: { x: -0.9 * a, z: 3.9 + 0.3 * b }, handB: { x: 0.9 * a, z: 3.9 - 0.3 * b }, knee: 0.4,
+  });
+}
+export const crouchPose = () => rig({ hip: { x: 0, z: 1.7 }, sh: { x: 0.05, z: 3.2 }, head: { x: 0.1, z: 3.95 }, footF: { x: 0.65, z: 0 }, footB: { x: -0.65, z: 0 }, handF: { x: 0.35, z: 2.3 }, handB: { x: -0.35, z: 2.3 }, ws: 0.75, wh: 0.6, knee: 0.7 });
+
 // 打者的姿勢（單位：呎，x 以打者站的位置為 0、朝本壘為正，z 向上）。
 // load 0~1：舉棒蓄力＋跨步；k 0~1：揮棒進度（0.5 = 球棒到達球的位置）；type：contact / foul / whiff / take；z：球過本壘的高度
 export function batPose(load, k, type, z) {
@@ -316,14 +336,15 @@ export function buildScript(play, prev) {
 const entPos = (ent, t) => {
   // 還沒開始跑：站在原本的壘包（打者在移動前不顯示）
   let cur = ent.base ? { ...{ x: BASE_XY[ent.base][0], y: BASE_XY[ent.base][1] } } : null;
-  let gone = false;
+  let gone = false, moving = false;
   for (const mv of ent.moves) {
     if (t < mv.t0) { if (!cur) { const b = BASE_XY[mv.path[0]]; if (mv.path[0] !== 'H') cur = { x: b[0], y: b[1] }; } break; }
     const u = (t - mv.t0) / mv.dur;
     cur = runnerPos(mv.path, u);
     gone = (mv.out || mv.scored) && u >= 1;
+    moving = u > 0 && u < 1;
   }
-  return cur && !gone ? cur : null;
+  return cur && !gone ? { ...cur, moving } : null;
 };
 
 const hitAt = (s, u) => { const p = hitPos(s.hp, u); if (s.start) { p.x += s.start.x * (1 - u); p.z += (s.start.z - 3) * (1 - u); } return p; }; // 從球實際過本壘的位置接續

@@ -69,6 +69,9 @@ assert.ok(frames > 3000, '至少掃了幾千格');
   assert.ok(seg && frameAt(sc, seg.t0 + 0.3).scene === 'field');
   assert.deepStrictEqual(sc.evcaps.map((e) => e.text), ['盜二壘成功']);
   assert.deepStrictEqual(frameAt(sc, 0).runners.map(pos), [[64, 64]], '一開始跑者站在一壘');
+  assert.strictEqual(frameAt(sc, 0).runners[0].moving, false, '還沒起跑：站著');
+  assert.strictEqual(frameAt(sc, seg.t0 + 0.3 + 0.45).runners[0].moving, true, '盜壘途中：在跑');
+  assert.strictEqual(frameAt(sc, sc.total).runners[0].moving, false, '到壘後：站著');
   assert.deepStrictEqual(frameAt(sc, sc.total).runners.map(pos), [[0, 127]]);
 }
 
