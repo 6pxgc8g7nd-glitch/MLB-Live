@@ -702,13 +702,6 @@ a.bk2c:active { filter: brightness(.97); }
 .game .g-tm .rc { font-size: 12px; opacity: 1; }
 .game .g-tm.lose img, .game .g-tm.lose .pq { opacity: .4; }
 
-/* ---------- 主頁左右滑動：疊層視差 ---------- */
-html.sw-on, html.sw-on body { overflow-x: clip; }
-.sw-layer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 12; background: var(--bg); will-change: transform; overflow: hidden; }
-.sw-layer.in, .sw-layer.sw-ghost { box-shadow: -10px 0 20px rgba(0, 0, 0, .22); }
-.sw-layer.under { z-index: 0; }
-.sw-ghost main { margin-top: 0; }
-
 /* ---------- 骨架畫面（載入中） ---------- */
 .loading.skelbox { padding: 0; text-align: left; }
 .sk { display: block; background: #d8dee6; border-radius: 6px; }
@@ -729,7 +722,6 @@ i.sk { font-style: normal; height: 12px; }
 .sk-chips { display: flex; gap: 8px; margin-bottom: 14px; }
 .sk-chips .sk { flex: 1; height: 38px; border-radius: 12px; }
 .sk-h { height: 14px; }
-.sw-ph { margin: 0 auto; padding: 12px; max-width: 720px; }
 
 /* ---------- 比分：贏的比分深色、輸的淡化 ---------- */
 .big .sc.l { color: var(--sub); opacity: .5; font-weight: 700; }

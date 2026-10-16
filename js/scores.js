@@ -145,12 +145,9 @@ export function shortName(full) {
 // 已結束的比賽：贏的比分維持深色、輸的淡化（進行中不套用）
 export const scN = (v, win, lose) => (win || lose ? `<span class="sc ${win ? 'w' : 'l'}">${dash(v)}</span>` : dash(v));
 
-/* 載入中的骨架畫面：票券／排名列的灰色外形（不動畫），換頁占位也共用 */
+/* 載入中的骨架畫面：票券／排名列的灰色外形（不動畫）， */
 export const skelTicket = () => '<div class="game skel" aria-hidden="true"><span class="gt sk"></span><div class="ser"><i class="sk w40"></i></div><div class="g-body"><div class="sk-tm"><i class="sk c"></i><i class="sk w50"></i></div><div class="sk-mid"><i class="sk w70"></i></div><div class="sk-tm"><i class="sk c"></i><i class="sk w50"></i></div></div><div class="tear"></div><div class="gf"><i class="sk w50"></i></div></div>';
 export const skelRows = (n) => `<div class="tcs skel" aria-hidden="true">${Array.from({ length: n }, () => '<div class="tc"><i class="sk c"></i><div class="sk-col"><i class="sk w60"></i><i class="sk w40"></i></div><i class="sk w15 sk-r"></i></div>').join('')}</div>`;
-export const skelPage = (name) => (name === 'standings'
-  ? '<div class="chips stt sk-chips" aria-hidden="true"><i class="sk"></i><i class="sk"></i><i class="sk"></i><i class="sk"></i></div><h2 class="grp"><i class="sk w30 sk-h"></i></h2>' + skelRows(5)
-  : name === 'settings' ? skelRows(4) : '<h2 class="grp"><i class="sk w30 sk-h"></i></h2>' + skelTicket() + skelTicket());
 
 export function showScores() {
   setRoute('scores');

@@ -351,6 +351,28 @@ with sync_playwright() as p:
             pg.click('#langBtn'); pg.wait_for_timeout(300)
         if name == 'gametop' and pg.evaluate("document.querySelectorAll('#liveBar [data-player]').length"):
             failures.append((name, ['目前打席條不應該點了開球員小卡']))
+        if name == 'scores':
+            # 比分頁：整個畫面左右滑動換日（往左＝後一天、往右＝前一天）；只滑一點點不換；仍停在比分頁
+            def pswipe(dx, y=500):
+                x0 = 195 - dx / 2
+                pg.mouse.move(x0, y); pg.mouse.down()
+                for i in range(1, 8): pg.mouse.move(x0 + dx * i / 7, y); pg.wait_for_timeout(15)
+                pg.mouse.up(); pg.wait_for_timeout(900)
+            lab = lambda: pg.evaluate("document.querySelector('#segC b').textContent")
+            l0 = lab(); pswipe(-220); l1 = lab(); pswipe(220); l2 = lab(); pswipe(30); l3 = lab(); pswipe(220); l4 = lab(); pswipe(-220)
+            print('page swipe:', l0, l1, l2, l3, l4, pg.evaluate('location.hash'))
+            if l0 != 'Today' or l1 == 'Today' or l2 != 'Today' or l3 != 'Today' or l4 == 'Today' or pg.evaluate('location.hash') != '#/scores':
+                failures.append((name, ['比分頁滑動換日不正常：%s' % [l0, l1, l2, l3, l4]]))
+            if pg.evaluate("document.getElementById('view').style.transform") != '': failures.append((name, ['滑動結束後頁面的位移沒有清掉']))
+        if name == 'stand':
+            # 其他頁面左右滑動不會換頁
+            h0 = pg.evaluate('location.hash')
+            for dx in (-250, 250):
+                x0 = 195 - dx / 2
+                pg.mouse.move(x0, 500); pg.mouse.down()
+                for i in range(1, 8): pg.mouse.move(x0 + dx * i / 7, 500); pg.wait_for_timeout(15)
+                pg.mouse.up(); pg.wait_for_timeout(700)
+            if pg.evaluate('location.hash') != h0: failures.append((name, ['排名頁左右滑動不該換頁：%s → %s' % (h0, pg.evaluate('location.hash'))]))
         if name == 'yday':
             # 日期小票：往右滑＝前一天；往左滑回來＝今天；小幅滑動（不到門檻）不換日；單擊回到今天
             def swipe(dx):

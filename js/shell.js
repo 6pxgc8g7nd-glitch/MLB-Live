@@ -95,6 +95,12 @@ export function openCal(sel, onPick) {
   loadMonth();
 }
 /* 日期小票：左右滑動換日（往左滑＝後一天、往右滑＝前一天，文字不動）、單擊回到今天、長按（約 0.5 秒）開啟日期選擇器 */
+export function stepDay(n) { // 換到前／後 n 天（只在比分頁有效）
+  if (route$ !== 'scores') return;
+  S.date = shiftDate(S.date, n);
+  S.follow = S.date === twDate();
+  route();
+}
 export function bindSegs() {
   const c = $('#segC');
   let timer = null, longDone = false, st = null, mute = 0;
