@@ -445,7 +445,8 @@ export function frameAt(sc, t) {
   // 投手動作：每球出手前 0.6 秒開始（抬腿、跨步、揮臂），出手那一刻球從手上飛出，之後 0.45 秒收尾
   let pit = -1;
   for (const c of sc.caps) { if (t >= c.t0 - WIND && t <= c.t0 + 0.45) { pit = (t - c.t0) / WIND; break; } }
-  return { t, pit, contact, scene, m, endCam: isHit ? hs.cam0 : null, cam, ball, trail, trailCls, trail2, cap, evcap, zone, impact, bat, hud, runners, fielders, fx, banner: t >= sc.bannerT, hr: sc.hr };
+  const land = isHit ? { x: hs.hp.x, y: hs.hp.y, u: clamp((t - hs.t0) / (hs.t1 - hs.t0), 0, 1.5), foul: hs.foul, hr: hs.hr, air: hs.hp.kind === 'air' } : null; // 落點標記（遊戲裡球飛行時地面上的圓圈）
+  return { t, pit, land, contact, scene, m, endCam: isHit ? hs.cam0 : null, cam, ball, trail, trailCls, trail2, cap, evcap, zone, impact, bat, hud, runners, fielders, fx, banner: t >= sc.bannerT, hr: sc.hr };
 }
 
 // 電視轉播的比分條：比分、局數、出局數、壘上有人、目前球數。
