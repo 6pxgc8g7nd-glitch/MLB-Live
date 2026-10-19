@@ -8,7 +8,7 @@ const ease = (u) => u * u * (3 - 2 * u);
 export const DCAM = 6, EYE = 3, PLATE_Y = 17 / 12; // 舊的「捕手後方」視角常數，persp() 與測試還在用
 export const DP = DCAM + PLATE_Y;
 // 起點（投手背後）：鏡頭在本壘後方 130 呎（投手板後面約 70 呎）、高約 25 呎，望遠（F 大）看向打者胸口，視線從投手頭上越過
-export const START = { d: 112, alpha: 0.16, F: 11.5, tz: 3.6, shift: 0.55 };
+export const START = { d: 112, alpha: 0.16, F: 13, tz: 3.6, shift: 0.5 };
 const D1 = 8000; // 終點：拉到很遠、近似正交的俯視
 const ALPHA1 = Math.PI / 4; // 終點的俯角 45°，配合 2D 球場畫面的「往上偏移」畫法
 
@@ -46,7 +46,7 @@ export function projectPoly(c, pts, closed = true) {
 }
 
 // 球場配色（3D 場景與 2D 球場畫面共用，交接時才對得上）：高飽和的遊戲風格
-export const PAL = { grassA: '#3fae52', grassB: '#4cc060', dirt: '#e0ae6e', mound: '#cf9a58', stands: '#4a4592', standsTop: '#6d63c9', wall: '#1d7a3c', wallTop: '#ffd84d', line: '#ffffff', sky0: '#52b8ff', sky1: '#cdeeff' };
+export const PAL = { grassA: '#2c7a39', grassB: '#378a47', dirt: '#b5865a', mound: '#a57849', stands: '#222c4a', standsTop: '#34436e', wall: '#12372a', wallTop: '#e9c946', line: '#f4f4f0', sky0: '#2b6cb3', sky1: '#a8cdee' };
 
 // 球場地面（z = 0）的形狀。y 一律 ≥ -4（起點鏡頭在投手背後，本壘後方不需要畫）
 const arc = (a, ctrl, b, n = 14) => Array.from({ length: n + 1 }, (_, i) => { const u = i / n; return [(1 - u) * (1 - u) * a[0] + 2 * (1 - u) * u * ctrl[0] + u * u * b[0], (1 - u) * (1 - u) * a[1] + 2 * (1 - u) * u * ctrl[1] + u * u * b[1]]; });
@@ -67,10 +67,10 @@ const STRIPES = Array.from({ length: 24 }, (_, i) => i).filter((i) => i * 17 < 4
   return { poly: [[-h0, y0], [h0, y0], [h1, y1], [-h1, y1]], fill: PAL.grassB };
 });
 // 外野牆：立起來的牆面（z 0~8 呎）與牆頂的黃線；轉場拉成俯視後牆面淡出，以免跟 2D 畫面對不上
-const WALL_FACE = WALL.slice(0, -1).map((p, i) => ({ face: [[p[0], p[1], 0], [WALL[i + 1][0], WALL[i + 1][1], 0], [WALL[i + 1][0], WALL[i + 1][1], 8], [p[0], p[1], 8]], fill: i % 2 ? PAL.wall : '#238a46' }));
+const WALL_FACE = WALL.slice(0, -1).map((p, i) => ({ face: [[p[0], p[1], 0], [WALL[i + 1][0], WALL[i + 1][1], 0], [WALL[i + 1][0], WALL[i + 1][1], 8], [p[0], p[1], 8]], fill: i % 2 ? PAL.wall : '#184a35' }));
 export const GROUND = [
   { poly: [[-4000, -4], [4000, -4], [4000, 6000], [-4000, 6000]], fill: PAL.grassA },
-  { poly: [[-4000, 233], ...WALL, [4000, 233], [4000, 6000], [-4000, 6000]], fill: PAL.stands, crowd: true },
+  { poly: [[-4000, 233], ...WALL, [4000, 233], [4000, 6000], [-4000, 6000]], fill: PAL.stands },
   { poly: [[0, -4], [-233, 233], ...WALL.slice(1, -1), [233, 233]], fill: PAL.grassA },
   ...STRIPES,
   { poly: circle(0, 60.5, 95), fill: PAL.dirt },

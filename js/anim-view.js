@@ -13,10 +13,10 @@ const ZH = () => S.lang !== 'en';
 const L = (zh, en) => (ZH() ? zh : en);
 
 // 2D 球場畫面直接用 3D 場景的同一份地面資料（GROUND），顏色與形狀才會跟轉場結束時的畫面一模一樣
-const fieldSVG = () => `<defs><pattern id="crowd2" width="9" height="7" patternUnits="userSpaceOnUse"><circle cx="1.8" cy="1.8" r="1.3" fill="#ff8fa3"/><circle cx="6.2" cy="2" r="1.3" fill="#ffd84d"/><circle cx="4" cy="5.2" r="1.3" fill="#8fd3ff"/></pattern></defs><g transform="scale(1,-1)">${GROUND.filter((g) => !g.wallFace).map((g) => {
+const fieldSVG = () => `<g transform="scale(1,-1)">${GROUND.filter((g) => !g.wallFace).map((g) => {
   const pts = g.pts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
   const stroke = g.stroke ? ` stroke="${g.stroke}" stroke-width="${g.sw}" vector-effect="non-scaling-stroke"` : '';
-  return (g.closed ? `<polygon points="${pts}" fill="${g.fill || 'none'}"${stroke}${g.op ? ` opacity="${g.op}"` : ''}/>` : `<polyline points="${pts}" fill="none"${stroke}/>`) + (g.crowd ? `<polygon points="${pts}" fill="url(#crowd2)" opacity=".6"/>` : '');
+  return (g.closed ? `<polygon points="${pts}" fill="${g.fill || 'none'}"${stroke}${g.op ? ` opacity="${g.op}"` : ''}/>` : `<polyline points="${pts}" fill="none"${stroke}/>`);
 }).join('')}</g>`;
 
 const f2 = (n) => n.toFixed(3);
@@ -38,6 +38,8 @@ export function openAnim(play, gd, allPlays, feed) {
       <polyline id="anTr" class="an-tr" fill="none" vector-effect="non-scaling-stroke"/><polyline id="anTr2" class="an-tr2" fill="none" vector-effect="non-scaling-stroke"/>
       <circle id="anLand" class="an-land" r="0"/><g id="anFx"></g><g id="anRn"></g>
       <g id="anBall"><ellipse id="anSh" class="an-sh"/><circle id="anBc" class="an-bc"/></g></svg>
+      <div class="an-bcard"><i class="cc"></i><div><small>${L('打者', 'AT BAT')}</small><b class="bc-n"></b><span class="bc-s"></span></div></div>
+      <div class="an-pcard"><i class="cc"></i><div><small>${L('投手', 'PITCHING')}</small><b class="bc-n"></b><span class="bc-s"></span></div></div>
       <div class="an-sb"><div class="sb-tm"><div class="sb-row"><i class="sb-c a"></i><span class="sb-a"></span><b class="sb-sa">0</b></div><div class="sb-row"><i class="sb-c h"></i><span class="sb-h"></span><b class="sb-sh">0</b></div></div>
         <div class="sb-mid"><div class="sb-in"></div><svg class="sb-d" viewBox="0 0 34 30" aria-hidden="true"><rect class="b2" x="14" y="2" width="7" height="7" transform="rotate(45 17.5 5.5)"/><rect class="b3" x="3" y="12" width="7" height="7" transform="rotate(45 6.5 15.5)"/><rect class="b1" x="25" y="12" width="7" height="7" transform="rotate(45 28.5 15.5)"/></svg></div>
         <div class="sb-lp"><div class="lp b"><u>B</u><i></i><i></i><i></i></div><div class="lp s"><u>S</u><i></i><i></i></div><div class="lp o"><u>O</u><i></i><i></i></div></div></div>
@@ -61,6 +63,15 @@ export function openAnim(play, gd, allPlays, feed) {
     $e('.sb-a').textContent = teamAbbr(away) || 'AWAY'; $e('.sb-h').textContent = teamAbbr(home) || 'HOME';
     $e('.sb-c.a').style.background = teamColor(away); $e('.sb-c.h').style.background = teamColor(home);
     el.style.setProperty('--def', pitColor); el.style.setProperty('--off', batColor);
+    el.querySelector('.an-bcard .cc').style.background = batColor; el.querySelector('.an-pcard .cc').style.background = pitColor;
+    const bsx = feed && feed.liveData && feed.liveData.boxscore && feed.liveData.boxscore.teams;
+    const find = (id) => { for (const sd of ['away', 'home']) { const p = bsx && bsx[sd] && bsx[sd].players && bsx[sd].players['ID' + id]; if (p) return p; } return null; };
+    const bp = find(m.batter && m.batter.id), pp2 = find(m.pitcher && m.pitcher.id);
+    const HB = { R: L('右打', 'R'), L: L('左打', 'L'), S: L('左右開弓', 'S') }, HP = { R: L('右投', 'R'), L: L('左投', 'L') };
+    const avg = bp && bp.seasonStats && bp.seasonStats.batting && bp.seasonStats.batting.avg, era = pp2 && pp2.seasonStats && pp2.seasonStats.pitching && pp2.seasonStats.pitching.era;
+    el.querySelector('.an-bcard .bc-n').textContent = bat; el.querySelector('.an-pcard .bc-n').textContent = pit;
+    el.querySelector('.an-bcard .bc-s').textContent = [bp && bp.jerseyNumber ? '#' + bp.jerseyNumber : '', HB[m.batSide && m.batSide.code], avg ? `AVG ${avg}` : ''].filter(Boolean).join(' · ');
+    el.querySelector('.an-pcard .bc-s').textContent = [pp2 && pp2.jerseyNumber ? '#' + pp2.jerseyNumber : '', HP[m.pitchHand && m.pitchHand.code], era ? `ERA ${era}` : ''].filter(Boolean).join(' · ');
   }
   const dir = rightie ? 1 : -1;
   const opener = document.activeElement;
@@ -74,25 +85,25 @@ export function openAnim(play, gd, allPlays, feed) {
 
   // 捕手視角與轉場：同一台針孔攝影機，從本壘後方拉高、拉遠成球場俯視（cam3d.js）。每格重畫整個 3D 場景
   // Q 版球員：大頭、粗肢體、黑色描邊，穿球隊顏色。依姿勢逐格重畫；W 把（x, z, y）換成世界座標（呼叫端已把身體縮成 Q 版比例）；jersey 是球衣顏色；o.back 是背對鏡頭（投手）
-  const SKIN = '#f2b98a', PANTS = '#f4f6fa', INK = '#151b26';
+  const SKIN = '#d8a37c', PANTS = '#e9ecf1', INK = 'rgba(8,12,20,.6)';
   const figure = (c, W, p, jersey, o) => {
     const P2 = (q) => project(c, W(q.x, q.z, q.y));
     const sc0 = P2(p.hip);
     if (!sc0) return '';
     const u = c.F / sc0.d; // 1 呎在畫面上的大小
-    const L = (a, b, w, col) => { const A = P2(a), B = P2(b); return A && B ? `<line x1="${f2(A.x)}" y1="${f2(A.y)}" x2="${f2(B.x)}" y2="${f2(B.y)}" stroke="${INK}" stroke-width="${f2((w + 0.2) * u)}" stroke-linecap="round"/><line x1="${f2(A.x)}" y1="${f2(A.y)}" x2="${f2(B.x)}" y2="${f2(B.y)}" stroke="${col}" stroke-width="${f2(w * u)}" stroke-linecap="round"/>` : ''; };
-    const shoe = (q) => { const A = P2(q); return A ? `<ellipse cx="${f2(A.x + (o.dir || 1) * 0.15 * u)}" cy="${f2(A.y)}" rx="${f2(0.62 * u)}" ry="${f2(0.3 * u)}" fill="#e8402f" stroke="${INK}" stroke-width="2" vector-effect="non-scaling-stroke"/>` : ''; };
+    const L = (a, b, w, col) => { const A = P2(a), B = P2(b); return A && B ? `<line x1="${f2(A.x)}" y1="${f2(A.y)}" x2="${f2(B.x)}" y2="${f2(B.y)}" stroke="${INK}" stroke-width="${f2((w + 0.09) * u)}" stroke-linecap="round"/><line x1="${f2(A.x)}" y1="${f2(A.y)}" x2="${f2(B.x)}" y2="${f2(B.y)}" stroke="${col}" stroke-width="${f2(w * u)}" stroke-linecap="round"/>` : ''; };
+    const shoe = (q) => { const A = P2(q); return A ? `<ellipse cx="${f2(A.x + (o.dir || 1) * 0.15 * u)}" cy="${f2(A.y)}" rx="${f2(0.46 * u)}" ry="${f2(0.21 * u)}" fill="#1b1f27" stroke="${INK}" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` : ''; };
     const PS = (q) => `${f2(q.x)},${f2(q.y)}`;
     const poly = projectPoly(c, [W(p.sh.x - p.ws, 4.95, p.sh.y), W(p.sh.x + p.ws, 4.95, p.sh.y), W(p.hip.x + p.wh, 3.0, p.hip.y), W(p.hip.x - p.wh, 3.0, p.hip.y)], true);
     const hd = P2(p.head);
-    const r = 0.82 * u;
+    const r = 0.42 * u;
     const gs = P2({ x: p.hip.x, z: 0, y: p.hip.y });
     let s = gs ? `<ellipse cx="${f2(gs.x)}" cy="${f2(gs.y)}" rx="${f2(1.5 * u)}" ry="${f2(0.5 * u * Math.max(0.35, c.up[2]))}" fill="rgba(0,0,0,.28)"/>` : ''; // 腳下的影子
-    s += L(p.hip, p.kneeB, 0.72, PANTS) + L(p.kneeB, p.footB, 0.6, o.sock || jersey) + shoe(p.footB) + L(p.hip, p.kneeF, 0.72, PANTS) + L(p.kneeF, p.footF, 0.6, o.sock || jersey) + shoe(p.footF); // 褲子到膝蓋，膝蓋以下是球隊顏色的長襪
-    s += L(p.elbowB, p.handB, 0.4, SKIN) + L(p.sh, p.elbowB, 0.5, jersey);
-    if (poly.length > 2) s += `<polygon points="${poly.map(PS).join(' ')}" fill="${jersey}" stroke="${INK}" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
-    s += L({ x: p.hip.x - p.wh * 0.9, z: 3.05, y: p.hip.y }, { x: p.hip.x + p.wh * 0.9, z: 3.05, y: p.hip.y }, 0.2, '#2a3140'); // 腰帶
-    s += L(p.elbowF, p.handF, 0.4, SKIN) + L(p.sh, p.elbowF, 0.5, jersey);
+    s += L(p.hip, p.kneeB, 0.5, PANTS) + L(p.kneeB, p.footB, 0.42, o.sock || jersey) + shoe(p.footB) + L(p.hip, p.kneeF, 0.5, PANTS) + L(p.kneeF, p.footF, 0.42, o.sock || jersey) + shoe(p.footF); // 褲子到膝蓋，膝蓋以下是球隊顏色的長襪
+    s += L(p.elbowB, p.handB, 0.26, SKIN) + L(p.sh, p.elbowB, 0.34, jersey);
+    if (poly.length > 2) s += `<polygon points="${poly.map(PS).join(' ')}" fill="${jersey}" stroke="${INK}" stroke-width="1.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
+    s += L({ x: p.hip.x - p.wh * 0.9, z: 3.05, y: p.hip.y }, { x: p.hip.x + p.wh * 0.9, z: 3.05, y: p.hip.y }, 0.14, '#1a1f26'); // 腰帶
+    s += L(p.elbowF, p.handF, 0.26, SKIN) + L(p.sh, p.elbowF, 0.34, jersey);
     if (hd) {
       const d1 = o.dir || 1;
       if (o.mask) { // 主審：深色帽子加護面罩
@@ -100,10 +111,9 @@ export function openAnim(play, gd, allPlays, feed) {
       } else if (o.back) { // 背對鏡頭：只看得到帽子與後腦
         s += `<circle cx="${f2(hd.x)}" cy="${f2(hd.y)}" r="${f2(r)}" fill="${jersey}" stroke="${INK}" stroke-width="3" vector-effect="non-scaling-stroke"/><circle cx="${f2(hd.x)}" cy="${f2(hd.y - r * 0.15)}" r="${f2(r * 0.18)}" fill="rgba(255,255,255,.55)"/>`;
       } else {
-        s += `<circle cx="${f2(hd.x)}" cy="${f2(hd.y)}" r="${f2(r)}" fill="${SKIN}" stroke="${INK}" stroke-width="3" vector-effect="non-scaling-stroke"/>`
-          + `<path d="M${f2(hd.x - r)} ${f2(hd.y - r * 0.05)} A${f2(r)} ${f2(r)} 0 0 1 ${f2(hd.x + r)} ${f2(hd.y - r * 0.05)} Z" fill="${jersey}" stroke="${INK}" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`
-          + `<ellipse cx="${f2(hd.x + d1 * r * 0.12)}" cy="${f2(hd.y - r * 0.02)}" rx="${f2(r * 1.02)}" ry="${f2(r * 0.22)}" fill="${jersey}" stroke="${INK}" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`
-          + `<circle cx="${f2(hd.x - r * 0.36 + d1 * r * 0.1)}" cy="${f2(hd.y + r * 0.3)}" r="${f2(r * 0.11)}" fill="${INK}"/><circle cx="${f2(hd.x + r * 0.36 + d1 * r * 0.1)}" cy="${f2(hd.y + r * 0.3)}" r="${f2(r * 0.11)}" fill="${INK}"/>`;
+        s += `<circle cx="${f2(hd.x)}" cy="${f2(hd.y)}" r="${f2(r)}" fill="${SKIN}" stroke="${INK}" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`
+          + `<path d="M${f2(hd.x - r)} ${f2(hd.y - r * 0.05)} A${f2(r)} ${f2(r)} 0 0 1 ${f2(hd.x + r)} ${f2(hd.y - r * 0.05)} Z" fill="${jersey}" stroke="${INK}" stroke-width="1.5" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`
+          + `<ellipse cx="${f2(hd.x + d1 * r * 0.12)}" cy="${f2(hd.y - r * 0.02)}" rx="${f2(r * 1.02)}" ry="${f2(r * 0.22)}" fill="${jersey}" stroke="${INK}" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`;
       }
     }
     return s + (o.extra || '');
@@ -116,7 +126,7 @@ export function openAnim(play, gd, allPlays, feed) {
     const c = camAt(f.m, a, { cx: ec.cx, cy: ec.y0 + hhE / 2, wv: wvE });
     const k = c.k, pxN = 2 / Math.max(1, st.clientWidth); // 1 px 在畫面座標裡有多大
     const P = (q) => `${f2(q.x)},${f2(q.y)}`;
-    let out = '<defs><pattern id="crowd3" width="0.06" height="0.05" patternUnits="userSpaceOnUse"><circle cx="0.012" cy="0.012" r="0.009" fill="#ff8fa3"/><circle cx="0.042" cy="0.014" r="0.009" fill="#ffd84d"/><circle cx="0.026" cy="0.036" r="0.009" fill="#8fd3ff"/></pattern></defs>'; // 看台觀眾的圓點花紋
+    let out = '';
     for (const g of GROUND) {
       const pts = projectPoly(c, g.pts, g.closed);
       if (pts.length < 2) continue;
@@ -124,7 +134,6 @@ export function openAnim(play, gd, allPlays, feed) {
       const gop = g.wallFace ? clamp(1 - k * 1.3, 0, 1) : g.op; // 牆面轉成俯視後淡出，跟 2D 畫面一致
       if (g.wallFace && gop <= 0) continue;
       out += g.closed ? `<polygon points="${pts.map(P).join(' ')}" fill="${g.fill || 'none'}"${stroke}${gop != null ? ` opacity="${gop}"` : ''}/>` : `<polyline points="${pts.map(P).join(' ')}" fill="none"${stroke}/>`;
-      if (g.crowd) out += `<polygon points="${pts.map(P).join(' ')}" fill="url(#crowd3)" opacity=".6"/>`;
     }
     const fade = clamp(1 - k * 1.6, 0, 1);
     const dot = (p, rFt, minPx, attrs) => { const s = project(c, p); return s ? `<circle cx="${f2(s.x)}" cy="${f2(s.y)}" r="${f2(Math.max((rFt * c.F) / s.d, minPx * pxN))}" ${attrs}/>` : ''; };
@@ -138,7 +147,7 @@ export function openAnim(play, gd, allPlays, feed) {
         + f.zone.map((z, i) => dot([z.x, zy, z.z], i === f.zone.length - 1 ? 0.17 : 0.13, 3, `class="pm-${pitchGroup(z.code)}" stroke="#fff" stroke-width="1" vector-effect="non-scaling-stroke" fill-opacity="${i === f.zone.length - 1 ? 1 : 0.7}"`)).join('')
         + (f.impact ? (() => { const s = project(c, [f.impact.x, zy, f.impact.z]); return s ? `<circle class="pv-ring ${f.impact.cls}" cx="${f2(s.x)}" cy="${f2(s.y)}" r="${f2(((0.2 + 0.45 * f.impact.k) * c.F) / s.d)}" opacity="${f2(1 - f.impact.k)}" fill="none" stroke-width="3" vector-effect="non-scaling-stroke"/>` : ''; })() : '') + '</g>';
     }
-    if (fade > 0.02) out += `<g opacity="${f2(fade)}">${figure(c, (x, z) => [0.2 + x * 1.15, -10.5, z * 0.82], standPose(), '#2a3140', { dir: 1, mask: true, sock: '#2a3140' })}</g>`; // 主審站在捕手後面（先畫，才會在捕手後面）
+    if (fade > 0.02) out += `<g opacity="${f2(fade)}">${figure(c, (x, z) => [0.4 + x, -10.5, z], standPose(), '#2a3140', { dir: 1, mask: true, sock: '#2a3140' })}</g>`; // 主審站在捕手後面（先畫，才會在捕手後面）
     // 野手：近處是站著的人，拉遠後縮成跟 2D 球場一樣的圓點
     const sorted = f.fielders.map((q) => ({ q, s: project(c, [q.x, q.y, 0]) })).filter((o) => o.s && o.s.d > 4).sort((u, v) => v.s.d - u.s.d);
     for (const { q, s } of sorted) {
@@ -148,7 +157,7 @@ export function openAnim(play, gd, allPlays, feed) {
       const r = (0.45 * c.F / s.d) * (1 - k) + (q.act ? 5 : 4) * pxN * k;
       if (fig) {
         const pose = q.act ? runPose(f.t * 7 + q.x * 0.05) : q.pos === 'C' ? crouchPose() : standPose();
-        out += `<g opacity="${f2(fade)}">${figure(c, (x, z) => [q.x + x * 1.15, q.y, z * 0.82], pose, pitColor, { dir: 1 })}</g>`;
+        out += `<g opacity="${f2(fade)}">${figure(c, (x, z) => [q.x + x, q.y, z], pose, pitColor, { dir: 1 })}</g>`;
         if (k < 0.35) continue;
       } else if (top && fade > 0.02) out += `<line x1="${f2(s.x)}" y1="${f2(s.y)}" x2="${f2(top.x)}" y2="${f2(top.y)}" stroke="${pitColor}" stroke-width="${f2((1.3 * c.F) / s.d)}" stroke-linecap="round" opacity="${f2(fade)}"/>`;
       out += `<circle cx="${f2((top || s).x)}" cy="${f2((top || s).y)}" r="${f2(r)}" fill="${q.act ? '#ffd84d' : pitColor}" stroke="#151b26" stroke-width="2" vector-effect="non-scaling-stroke"/>`;
@@ -157,7 +166,7 @@ export function openAnim(play, gd, allPlays, feed) {
     if (k < 0.7) {
       const al = f2(clamp(1 - k / 0.7, 0, 1));
       const p = batPose(f.bat.load, f.bat.k, f.bat.type, f.bat.z);
-      const Wb = (x, z) => [dir * (x * 1.15 - 2.1), 0.7, z * 0.82]; // Q 版比例：身體寬一點、矮一點
+      const Wb = (x, z) => [dir * (x - 2.1), 0.7, z];
       const lnB = (A, B, w, col) => { const a1 = project(c, Wb(A.x, A.z)), b1 = project(c, Wb(B.x, B.z)); return a1 && b1 ? `<line x1="${f2(a1.x)}" y1="${f2(a1.y)}" x2="${f2(b1.x)}" y2="${f2(b1.y)}" stroke="${col}" stroke-width="${f2((w * c.F) / a1.d)}" stroke-linecap="round"/>` : ''; };
       // 揮棒的掃痕：把最近一小段時間棒頭走過的範圍畫成淡淡的扇形，加上棒頭的軌跡線
       const sweep = (() => {
@@ -168,13 +177,13 @@ export function openAnim(play, gd, allPlays, feed) {
         return (pts.length > 2 ? `<polygon points="${pts.map(P).join(' ')}" fill="rgba(255,255,255,.17)"/>` : '') + (tl.length > 1 ? `<polyline points="${tl.map(P).join(' ')}" fill="none" stroke="rgba(255,236,170,.65)" stroke-width="2.5" stroke-linecap="round" vector-effect="non-scaling-stroke"/>` : '');
       })();
       const mid = { x: p.hands.x + (p.tip.x - p.hands.x) * 0.62, z: p.hands.z + (p.tip.z - p.hands.z) * 0.62 };
-      const bat = lnB(p.hands, p.tip, 0.34, INK) + lnB(p.hands, mid, 0.14, '#e0b27a') + lnB(mid, p.tip, 0.27, '#e0b27a'); // 球棒：細握把＋粗棒頭，黑色描邊
+      const bat = lnB(p.hands, p.tip, 0.24, INK) + lnB(p.hands, mid, 0.09, '#d8ad72') + lnB(mid, p.tip, 0.17, '#d8ad72'); // 球棒：細握把＋粗棒頭，黑色描邊
       out += `<g opacity="${al}">${figure(c, Wb, p, batColor, { dir, extra: sweep + bat })}</g>`;
       // 投手：站在投手丘上，每球出手前抬腿、揮臂，出手瞬間球離手
       const pp = pitcherPose(f.pit, pitDir);
-      const Wp = (x, z, y = 0) => [x * 1.15, 59.4 - y, z * 0.82 + 0.8]; // 站在投手板上，y 是往本壘方向的距離
+      const Wp = (x, z, y = 0) => [x, 59.4 - y, z + 0.8]; // 站在投手板上，y 是往本壘方向的距離
       const rel = f.pit < 0 ? (() => { const hs = project(c, Wp(pp.handF.x, pp.handF.z, pp.handF.y)); return hs ? `<circle cx="${f2(hs.x)}" cy="${f2(hs.y)}" r="${f2(Math.max((0.2 * c.F) / hs.d, 1.6 * pxN))}" fill="#fff"/>` : ''; })() : '';
-      const gl = (() => { const gs = project(c, Wp(pp.handB.x, pp.handB.z, pp.handB.y)); return gs ? `<circle cx="${f2(gs.x)}" cy="${f2(gs.y)}" r="${f2((0.55 * c.F) / gs.d)}" fill="#8a5a2b" stroke="#151b26" stroke-width="2.5" vector-effect="non-scaling-stroke"/>` : ''; })();
+      const gl = (() => { const gs = project(c, Wp(pp.handB.x, pp.handB.z, pp.handB.y)); return gs ? `<circle cx="${f2(gs.x)}" cy="${f2(gs.y)}" r="${f2((0.4 * c.F) / gs.d)}" fill="#7a4f26" stroke="rgba(8,12,20,.6)" stroke-width="1.5" vector-effect="non-scaling-stroke"/>` : ''; })();
       out += `<g opacity="${al}">${figure(c, Wp, pp, pitColor, { dir: 1, back: true, extra: gl + rel })}</g>`;
     }
     // 落點標記：球飛行時，地面上閃動的黃色圓圈（棒球遊戲的接球提示），落地後淡出
@@ -187,7 +196,7 @@ export function openAnim(play, gd, allPlays, feed) {
     for (const r of f.runners) {
       const rs = project(c, [r.x, r.y, 0]);
       if (rs && fade > 0.02 && rs.d < 260) {
-        out += `<g opacity="${f2(fade)}">${figure(c, (x, z) => [r.x + x * 1.15, r.y, z * 0.82], r.moving ? runPose(f.t * 8) : standPose(), batColor, { dir: 1 })}</g>`;
+        out += `<g opacity="${f2(fade)}">${figure(c, (x, z) => [r.x + x, r.y, z], r.moving ? runPose(f.t * 8) : standPose(), batColor, { dir: 1 })}</g>`;
         if (k < 0.35) continue;
       }
       out += dot([r.x, r.y, 0.8], 1.1, 5.5, `fill="${r.batter ? '#ff9a3c' : batColor}" stroke="#151b26" stroke-width="2" vector-effect="non-scaling-stroke"`);
