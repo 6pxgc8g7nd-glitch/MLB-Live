@@ -35,17 +35,20 @@ function fieldTexture(renderer, T) {
 }
 const crowdTexture = () => { // 看台觀眾：深藍底、零星的彩色小點
   const cv = document.createElement('canvas'); cv.width = cv.height = 256;
-  const g = cv.getContext('2d'); g.fillStyle = '#26315a'; g.fillRect(0, 0, 256, 256);
-  const cols = ['#c7cfe2', '#8b97b8', '#e3c46a', '#d96a6a', '#6aa6d9', '#f2f2f2'];
+  const g = cv.getContext('2d'); g.fillStyle = '#3d3fa6'; g.fillRect(0, 0, 256, 256);
+  const cols = ['#ffffff', '#ffd43b', '#ff6b6b', '#4dabf7', '#69db7c', '#f783ac'];
   let s = 7; const rnd = () => ((s = (s * 16807) % 2147483647) / 2147483647);
   for (let i = 0; i < 420; i++) { g.fillStyle = cols[Math.floor(rnd() * cols.length)]; g.globalAlpha = 0.55 + rnd() * 0.4; g.beginPath(); g.arc(rnd() * 256, rnd() * 256, 2 + rnd() * 2.4, 0, 6.3); g.fill(); }
   const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; return t;
 };
 const skyTexture = () => {
-  const cv = document.createElement('canvas'); cv.width = 8; cv.height = 256;
-  const g = cv.getContext('2d'); const gr = g.createLinearGradient(0, 0, 0, 256);
-  gr.addColorStop(0, '#3a78c2'); gr.addColorStop(0.5, '#79afdf'); gr.addColorStop(0.8, '#bddcf1'); gr.addColorStop(1, '#e1eef7');
-  g.fillStyle = gr; g.fillRect(0, 0, 8, 256);
+  const cv = document.createElement('canvas'); cv.width = 256; cv.height = 512;
+  const g = cv.getContext('2d'); const gr = g.createLinearGradient(0, 0, 0, 512);
+  gr.addColorStop(0, '#2f8cf0'); gr.addColorStop(0.55, '#6fc2ff'); gr.addColorStop(0.85, '#c4ebff'); gr.addColorStop(1, '#eaf8ff');
+  g.fillStyle = gr; g.fillRect(0, 0, 256, 512);
+  for (const [x, y, r] of [[60, 120, 34], [95, 112, 44], [135, 122, 32], [190, 230, 30], [222, 222, 40], [40, 300, 28], [72, 292, 38]]) { // 柔軟的白雲
+    const cg = g.createRadialGradient(x, y, 2, x, y, r); cg.addColorStop(0, 'rgba(255,255,255,.95)'); cg.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = cg; g.beginPath(); g.ellipse(x, y, r * 1.5, r * 0.8, 0, 0, 6.3); g.fill();
+  }
   const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
 };
 
@@ -62,21 +65,27 @@ function buildStadium(scene) {
     const m = new THREE.Mesh(geo, mat); scene.add(m); return m;
   };
   const row = (scale, h) => WALL.map(([x, y]) => { const d = Math.hypot(x, y) || 1, k = 1 + scale / d; return V(x * k, y * k, h); });
-  const wallMat = new THREE.MeshLambertMaterial({ color: PAL.wall, side: THREE.DoubleSide });
-  ribbon([row(0, 0), row(0, 9)], wallMat);
+  // 外野牆：每 4 個點一塊廣告板，輪流用鮮豔的顏色
+  const PANEL = ['#e8505b', '#3f8efc', '#ffd43b', '#51cf66'];
+  for (let i = 0, n = 0; i < WALL.length - 1; i += 3, n++) { const seg = WALL.slice(i, i + 4).map(([x, y]) => [x, y]); const mk = (h) => seg.map(([x, y]) => V(x, y, h)); ribbon([mk(0), mk(9)], new THREE.MeshLambertMaterial({ color: PANEL[n % 4], side: THREE.DoubleSide })); }
   ribbon([row(0, 9), row(0.4, 9.3)], new THREE.MeshBasicMaterial({ color: PAL.wallTop, side: THREE.DoubleSide }));
   const crowd = new THREE.MeshLambertMaterial({ map: crowdTexture(), side: THREE.DoubleSide });
   const tiers = [[3, 11], [14, 17], [26, 24], [40, 33], [56, 44], [74, 56]];
   ribbon(tiers.map(([d, h]) => row(d, h)), crowd, 36);
   // 本壘後面的看台：一圈弧形，由近到遠一層層升高（鏡頭在投手背後時，打者後面的背景就是它）
   const behind = (R, h) => Array.from({ length: 25 }, (_, i) => { const th = ((i / 24) * 2 - 1) * 1.35; return V(Math.sin(th) * R, -Math.cos(th) * R, h); });
-  ribbon([behind(62, 0), behind(62, 5)], new THREE.MeshLambertMaterial({ color: '#2a5da3', side: THREE.DoubleSide }));
+  ribbon([behind(62, 0), behind(62, 5)], new THREE.MeshLambertMaterial({ color: '#5b9dff', side: THREE.DoubleSide }));
   ribbon([behind(62, 5), behind(64, 5.3)], new THREE.MeshBasicMaterial({ color: '#e9ecf1', side: THREE.DoubleSide }));
   ribbon([[64, 6], [72, 15], [86, 27], [100, 38], [116, 50], [134, 63]].map(([d, h]) => behind(d, h)), crowd, 36);
 }
 
 // ───────── 人物 ─────────
-const MAT = { skin: '#d8a37c', pants: '#e9ecf1', shoe: '#1b1f27', belt: '#1a1f26', wood: '#d8ad72', glove: '#7a4f26' };
+// 卡通上色：三階色調（暗／中／亮），加上黑色描邊（把同一個形狀放大一點、反面畫黑色）
+const toonGrad = (() => { const t = new THREE.DataTexture(new Uint8Array([165, 215, 255]), 3, 1, THREE.RedFormat); t.minFilter = t.magFilter = THREE.NearestFilter; t.needsUpdate = true; return t; })();
+const toon = (c) => new THREE.MeshToonMaterial({ color: c, gradientMap: toonGrad });
+const OUTLINE = new THREE.MeshBasicMaterial({ color: '#141a26', side: THREE.BackSide });
+const CH = { x: 1.12, z: 0.74, thick: 1.55, head: 2.0 }; // Q 版比例：身體寬一點矮一點、四肢粗、頭是兩倍大
+const MAT = { skin: '#ffd2ad', pants: '#fbfbfd', shoe: '#e8402f', belt: '#26303f', wood: '#e8b87a', glove: '#8a5a2b' };
 const geoCache = {};
 const cyl = (rt, rb, seg = 12) => { const k = `${rt}_${rb}_${seg}`; return geoCache[k] || (geoCache[k] = new THREE.CylinderGeometry(rt, rb, 1, seg, 1)); };
 const sph = (r) => { const k = `s${r}`; return geoCache[k] || (geoCache[k] = new THREE.SphereGeometry(r, 16, 12)); };
@@ -87,31 +96,33 @@ class Humanoid {
   constructor(scene, lite = false) {
     this.lite = lite;
     this.g = new THREE.Group(); scene.add(this.g);
-    this.mat = { jersey: new THREE.MeshLambertMaterial({ color: '#888' }), sock: new THREE.MeshLambertMaterial({ color: '#888' }), cap: new THREE.MeshLambertMaterial({ color: '#888' }) };
-    const lam = (c) => new THREE.MeshLambertMaterial({ color: c });
-    this.m = { skin: lam(MAT.skin), pants: lam(MAT.pants), shoe: lam(MAT.shoe), belt: lam(MAT.belt), wood: lam(MAT.wood), glove: lam(MAT.glove), dark: lam('#2a3140'), mask: lam('#cfd6df') };
-    const add = (geo, mat) => { const o = new THREE.Mesh(geo, mat); o.frustumCulled = false; this.g.add(o); return o; };
-    this.torso = add(cyl(1, 0.82, 14), this.mat.jersey);
-    this.head = add(sph(0.42), this.m.skin); this.cap = add(capGeo(), this.mat.cap); this.brim = add(brimGeo(), this.mat.cap);
+    this.mat = { jersey: toon('#888'), sock: toon('#888'), cap: toon('#888') };
+    const lam = toon;
+    this.m = { skin: lam(MAT.skin), pants: lam(MAT.pants), shoe: lam(MAT.shoe), belt: lam(MAT.belt), wood: lam(MAT.wood), glove: lam(MAT.glove), dark: lam('#2a3140'), mask: lam('#e3e8ef'), eye: new THREE.MeshBasicMaterial({ color: '#141a26' }), white: new THREE.MeshBasicMaterial({ color: '#fff' }) };
+    // ol：描邊放大的倍數（[橫向, 長度方向]）；小零件與簡化版的野手不描邊
+    const add = (geo, mat, ol) => { const o = new THREE.Mesh(geo, mat); o.frustumCulled = false; this.g.add(o); if (ol && !lite) { const k = new THREE.Mesh(geo, OUTLINE); k.scale.set(ol[0], ol[1], ol[0]); k.frustumCulled = false; o.add(k); } return o; };
+    this.torso = add(cyl(1, 0.84, 16), this.mat.jersey, [1.1, 1.02]);
+    this.head = add(sph(0.42), this.m.skin, [1.1, 1.1]); this.cap = add(capGeo(), this.mat.cap, [1.1, 1.1]); this.brim = add(brimGeo(), this.mat.cap);
     this.neck = add(cyl(0.14, 0.16), this.m.skin);
-    this.eyeL = add(sph(0.045), this.m.belt); this.eyeR = add(sph(0.045), this.m.belt);
-    this.legF = add(cyl(0.22, 0.19), this.m.pants); this.legB = add(cyl(0.22, 0.19), this.m.pants);
-    this.shoeF = add(new THREE.BoxGeometry(0.5, 0.26, 0.95), this.m.shoe); this.shoeB = add(new THREE.BoxGeometry(0.5, 0.26, 0.95), this.m.shoe);
+    this.eyeL = add(sph(0.045), this.m.eye); this.eyeR = add(sph(0.045), this.m.eye);
+    this.glL = add(sph(0.016), this.m.white); this.glR = add(sph(0.016), this.m.white);
+    this.legF = add(cyl(0.22, 0.19), this.m.pants, [1.3, 1.0]); this.legB = add(cyl(0.22, 0.19), this.m.pants, [1.3, 1.0]);
+    this.shoeF = add(new THREE.BoxGeometry(0.5, 0.26, 0.95), this.m.shoe, [1.2, 1.2]); this.shoeB = add(new THREE.BoxGeometry(0.5, 0.26, 0.95), this.m.shoe, [1.2, 1.2]);
     if (!lite) {
-      this.shinF = add(cyl(0.19, 0.15), this.mat.sock); this.shinB = add(cyl(0.19, 0.15), this.mat.sock);
+      this.shinF = add(cyl(0.19, 0.15), this.mat.sock, [1.3, 1.0]); this.shinB = add(cyl(0.19, 0.15), this.mat.sock, [1.3, 1.0]);
       this.kneeF = add(sph(0.2), this.m.pants); this.kneeB = add(sph(0.2), this.m.pants);
-      this.upF = add(cyl(0.16, 0.13), this.mat.jersey); this.upB = add(cyl(0.16, 0.13), this.mat.jersey);
-      this.foF = add(cyl(0.13, 0.1), this.m.skin); this.foB = add(cyl(0.13, 0.1), this.m.skin);
+      this.upF = add(cyl(0.16, 0.13), this.mat.jersey, [1.3, 1.0]); this.upB = add(cyl(0.16, 0.13), this.mat.jersey, [1.3, 1.0]);
+      this.foF = add(cyl(0.13, 0.1), this.m.skin, [1.3, 1.0]); this.foB = add(cyl(0.13, 0.1), this.m.skin, [1.3, 1.0]);
       this.elF = add(sph(0.14), this.m.skin); this.elB = add(sph(0.14), this.m.skin);
-      this.hdF = add(sph(0.14), this.m.skin); this.hdB = add(sph(0.14), this.m.skin);
+      this.hdF = add(sph(0.14), this.m.skin, [1.3, 1.3]); this.hdB = add(sph(0.14), this.m.skin, [1.3, 1.3]);
       this.dtF = add(sph(0.2), this.mat.jersey); this.dtB = add(sph(0.2), this.mat.jersey);
-      this.beltM = add(cyl(1, 1, 14), this.m.belt);
-      this.maskM = add(new THREE.BoxGeometry(0.62, 0.5, 0.12), this.m.mask);
-      this.bat = add(new THREE.CylinderGeometry(0.17, 0.045, 1, 10), this.m.wood);
-      this.gloveM = add(sph(0.36), this.m.glove);
-      this.ballM = add(sph(0.13), new THREE.MeshLambertMaterial({ color: '#ffffff' }));
+      this.beltM = add(cyl(1, 1, 16), this.m.belt);
+      this.maskM = add(new THREE.BoxGeometry(0.62, 0.5, 0.12), this.m.mask, [1.12, 1.12]);
+      this.bat = add(new THREE.CylinderGeometry(0.17, 0.045, 1, 12), this.m.wood, [1.3, 1.0]);
+      this.gloveM = add(sph(0.36), this.m.glove, [1.12, 1.12]);
+      this.ballM = add(sph(0.13), this.m.white);
     }
-    this.shadow = new THREE.Mesh(new THREE.CircleGeometry(1, 20), new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0.28, depthWrite: false }));
+    this.shadow = new THREE.Mesh(new THREE.CircleGeometry(1, 20), new THREE.MeshBasicMaterial({ color: '#000', transparent: true, opacity: 0.3, depthWrite: false }));
     this.shadow.rotation.x = -Math.PI / 2; scene.add(this.shadow);
   }
   colors(jersey, sock = jersey, cap = jersey) { this.mat.jersey.color.set(jersey); this.mat.sock.color.set(sock); this.mat.cap.color.set(cap); return this; }
@@ -123,37 +134,42 @@ class Humanoid {
   }
   // 依姿勢（關節座標）擺好全身。W：把（x, z, y）換成世界座標 [X, Y, Z]；facing：頭朝向 +1＝往外野（打者看著投手）、-1＝往本壘；o：{ back, mask, bat:{hands,tip}, glove, ball }
   update(p, W, facing, o = {}) {
-    const J = (q) => W2V(W(q.x, q.z, q.y || 0));
+    const J = (q) => W2V(W(q.x * CH.x, q.z * CH.z, q.y || 0));
+    const T = CH.thick, hs = CH.head;
     const hip = J(p.hip), sh = J(p.sh), fF = J(p.footF), fB = J(p.footB);
-    const head = sh.clone().lerp(J(p.head), 0.6); // 3D 的頭離肩膀近一點（2D 姿勢的頭抬得比較高）
+    const head = sh.clone().lerp(J(p.head), 0.55).add(new THREE.Vector3(0, 0.55, 0)); // 大頭：往上抬一點，才不會埋進肩膀
     this.visible = true;
-    this.seg(this.torso, hip, sh, 1); this.torso.scale.set(((p.wh + p.ws) * 0.5) * 0.82 + 0.05, this.torso.scale.y, 0.48);
-    this.head.position.copy(head);
-    this.neck.position.copy(sh).add(new THREE.Vector3(0, 0.12, 0)); this.neck.scale.set(1, Math.max(0.1, head.y - sh.y), 1);
-    const ey = head.clone().add(new THREE.Vector3(0, -0.02, facing * -0.37)); this.eyeL.position.copy(ey).add(new THREE.Vector3(-0.15, 0, 0)); this.eyeR.position.copy(ey).add(new THREE.Vector3(0.15, 0, 0));
-    this.eyeL.visible = this.eyeR.visible = !o.back && !o.mask;
-    this.cap.position.copy(head).add(new THREE.Vector3(0, 0.03, 0)); this.cap.scale.setScalar(0.42);
-    this.brim.position.copy(head).add(new THREE.Vector3(0, 0.1, facing * -0.26)); this.brim.scale.set(0.5, 1, 0.6); this.brim.rotation.y = facing > 0 ? Math.PI : 0;
+    this.seg(this.torso, hip, sh, 1); this.torso.scale.set(((p.wh + p.ws) * 0.5) * 0.95 + 0.2, this.torso.scale.y, 0.6);
+    this.head.position.copy(head); this.head.scale.setScalar(hs);
+    this.neck.position.copy(sh).add(new THREE.Vector3(0, 0.1, 0)); this.neck.scale.set(1.3, Math.max(0.1, head.y - sh.y - 0.2), 1.3);
+    const er = 0.42 * hs, ey = head.clone().add(new THREE.Vector3(0, -0.06, facing * -er * 0.9));
+    this.eyeL.position.copy(ey).add(new THREE.Vector3(-0.3, 0, 0)); this.eyeR.position.copy(ey).add(new THREE.Vector3(0.3, 0, 0));
+    this.eyeL.scale.setScalar(1.9); this.eyeR.scale.setScalar(1.9);
+    this.glL.position.copy(this.eyeL.position).add(new THREE.Vector3(0.05, 0.06, facing * -0.05)); this.glR.position.copy(this.eyeR.position).add(new THREE.Vector3(0.05, 0.06, facing * -0.05)); this.glL.scale.setScalar(1.9); this.glR.scale.setScalar(1.9);
+    this.eyeL.visible = this.eyeR.visible = this.glL.visible = this.glR.visible = !o.back && !o.mask;
+    this.cap.position.copy(head).add(new THREE.Vector3(0, 0.06, 0)); this.cap.scale.setScalar(0.42 * hs);
+    this.brim.position.copy(head).add(new THREE.Vector3(0, 0.22, facing * -er * 0.75)); this.brim.scale.set(0.5 * hs, 1, 0.62 * hs); this.brim.rotation.y = facing > 0 ? Math.PI : 0;
     this.brim.visible = !o.back;
-    this.seg(this.legF, hip, fF, 1); this.seg(this.legB, hip, fB, 1);
-    this.legF.scale.x = this.legF.scale.z = 1; this.legB.scale.x = this.legB.scale.z = 1;
-    this.shoeF.position.copy(fF).add(new THREE.Vector3(0, 0.1, -facing * 0.2)); this.shoeB.position.copy(fB).add(new THREE.Vector3(0, 0.1, -facing * 0.2));
-    this.shadow.position.set(hip.x, 0.04, hip.z); this.shadow.scale.set(1.5, 1.5, 1.5);
+    this.seg(this.legF, hip, fF, T); this.seg(this.legB, hip, fB, T);
+    this.shoeF.position.copy(fF).add(new THREE.Vector3(0, 0.12, -facing * 0.3)); this.shoeB.position.copy(fB).add(new THREE.Vector3(0, 0.12, -facing * 0.3));
+    this.shoeF.scale.setScalar(1.35); this.shoeB.scale.setScalar(1.35);
+    this.shadow.position.set(hip.x, 0.04, hip.z); this.shadow.scale.set(1.9, 1.9, 1.9);
     if (this.lite) return this;
     const kF = J(p.kneeF), kB = J(p.kneeB);
-    this.seg(this.legF, hip, kF, 1); this.seg(this.legB, hip, kB, 1);
-    this.seg(this.shinF, kF, fF, 1); this.seg(this.shinB, kB, fB, 1);
-    this.kneeF.position.copy(kF); this.kneeB.position.copy(kB);
+    this.seg(this.legF, hip, kF, T); this.seg(this.legB, hip, kB, T);
+    this.seg(this.shinF, kF, fF, T); this.seg(this.shinB, kB, fB, T);
+    this.kneeF.position.copy(kF); this.kneeB.position.copy(kB); this.kneeF.scale.setScalar(T); this.kneeB.scale.setScalar(T);
     const eF = J(p.elbowF), eB = J(p.elbowB), hF = J(p.handF), hB = J(p.handB);
-    const shF = sh.clone().add(new THREE.Vector3(p.ws * 0.6, -0.1, 0)), shB = sh.clone().add(new THREE.Vector3(-p.ws * 0.6, -0.1, 0));
-    this.seg(this.upF, shF, eF, 1); this.seg(this.upB, shB, eB, 1); this.seg(this.foF, eF, hF, 1); this.seg(this.foB, eB, hB, 1);
+    const shF = sh.clone().add(new THREE.Vector3(p.ws * 0.6 * CH.x, -0.1, 0)), shB = sh.clone().add(new THREE.Vector3(-p.ws * 0.6 * CH.x, -0.1, 0));
+    this.seg(this.upF, shF, eF, T); this.seg(this.upB, shB, eB, T); this.seg(this.foF, eF, hF, T); this.seg(this.foB, eB, hB, T);
     this.elF.position.copy(eF); this.elB.position.copy(eB); this.hdF.position.copy(hF); this.hdB.position.copy(hB); this.dtF.position.copy(shF); this.dtB.position.copy(shB);
+    this.elF.scale.setScalar(T); this.elB.scale.setScalar(T); this.hdF.scale.setScalar(1.5); this.hdB.scale.setScalar(1.5); this.dtF.scale.setScalar(T); this.dtB.scale.setScalar(T);
     const bm = hip.clone().lerp(sh, 0.04);
-    this.beltM.position.copy(bm); this.beltM.scale.set(this.torso.scale.x * 0.86, 0.16, 0.48 * 0.86);
-    this.maskM.visible = !!o.mask; if (o.mask) this.maskM.position.copy(head).add(new THREE.Vector3(0, -0.08, facing * 0.3));
-    this.bat.visible = !!o.bat; if (o.bat) { const a = W2V(W(o.bat.hands.x, o.bat.hands.z, 0)), b = W2V(W(o.bat.tip.x, o.bat.tip.z, 0)); this.seg(this.bat, a, b, 1); this.bat.scale.x = this.bat.scale.z = 1; this.bat.scale.set(1, a.distanceTo(b), 1); }
-    this.gloveM.visible = !!o.glove; if (o.glove) this.gloveM.position.copy(hB);
-    this.ballM.visible = !!o.ball; if (o.ball) this.ballM.position.copy(hF);
+    this.beltM.position.copy(bm); this.beltM.scale.set(this.torso.scale.x * 0.88, 0.2, 0.6 * 0.88);
+    this.maskM.visible = !!o.mask; if (o.mask) { this.maskM.position.copy(head).add(new THREE.Vector3(0, -0.1, facing * er * 0.8)); this.maskM.scale.setScalar(hs * 1.1); }
+    this.bat.visible = !!o.bat; if (o.bat) { const a = W2V(W(o.bat.hands.x * CH.x, o.bat.hands.z * CH.z, 0)), b = W2V(W(o.bat.tip.x * CH.x, o.bat.tip.z * CH.z, 0)); this.seg(this.bat, a, b, 1.5); this.bat.scale.set(1.5, a.distanceTo(b), 1.5); }
+    this.gloveM.visible = !!o.glove; if (o.glove) { this.gloveM.position.copy(hB); this.gloveM.scale.setScalar(1.4); }
+    this.ballM.visible = !!o.ball; if (o.ball) { this.ballM.position.copy(hF); this.ballM.scale.setScalar(1.4); }
     return this;
   }
 }
@@ -166,13 +182,13 @@ export function createStage(host, opts) {
   const canvas = renderer.domElement; canvas.id = 'an3d'; canvas.setAttribute('aria-hidden', 'true');
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(17, 0.6, 1, 40000);
-  scene.add(new THREE.HemisphereLight('#dcebff', '#3c5a30', 1.15));
-  const sun = new THREE.DirectionalLight('#fff4de', 1.15); sun.position.set(-90, 160, 40); scene.add(sun);
+  scene.add(new THREE.HemisphereLight('#ffffff', '#6fa860', 1.35));
+  const sun = new THREE.DirectionalLight('#fffbe8', 1.1); sun.position.set(-90, 160, 40); scene.add(sun);
   scene.background = skyTexture();
-  scene.fog = new THREE.Fog('#a9c9e6', 1200, 6000); // 遠處慢慢融進天空的顏色
+  scene.fog = new THREE.Fog('#bfe6ff', 1200, 6000); // 遠處慢慢融進天空的顏色
 
   // 地面：大貼圖＋外圍一大片深色（遮住貼圖外面的空白）
-  const outer = new THREE.Mesh(new THREE.PlaneGeometry(30000, 30000), new THREE.MeshLambertMaterial({ color: '#2a3350' })); outer.rotation.x = -Math.PI / 2; outer.position.y = -0.2; scene.add(outer);
+  const outer = new THREE.Mesh(new THREE.PlaneGeometry(30000, 30000), new THREE.MeshLambertMaterial({ color: '#4a4fae' })); outer.rotation.x = -Math.PI / 2; outer.position.y = -0.2; scene.add(outer);
   const patch = (T, y) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(T.x1 - T.x0, T.y1 - T.y0), new THREE.MeshLambertMaterial({ map: fieldTexture(renderer, T) })); m.rotation.x = -Math.PI / 2; m.position.set((T.x0 + T.x1) / 2, y, -(T.y0 + T.y1) / 2); scene.add(m); return m; };
   patch(TEX_ALL, 0); patch(TEX_HOME, 0.02);
   buildStadium(scene);

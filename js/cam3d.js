@@ -4,7 +4,7 @@
 export const DCAM = 6, EYE = 3, PLATE_Y = 17 / 12; // 舊的「捕手後方」視角常數，persp() 與測試還在用
 export const DP = DCAM + PLATE_Y;
 // 球場配色（3D 場景與 2D 球場畫面共用，交接時才對得上）：高飽和的遊戲風格
-export const PAL = { grassA: '#2c7a39', grassB: '#378a47', dirt: '#b5865a', mound: '#a57849', stands: '#222c4a', standsTop: '#34436e', wall: '#12372a', wallTop: '#e9c946', line: '#f4f4f0', sky0: '#2b6cb3', sky1: '#a8cdee' };
+export const PAL = { grassA: '#44b653', grassB: '#57ca65', dirt: '#e5b17a', mound: '#d49c60', stands: '#3b3d9e', standsTop: '#5a5fd0', wall: '#2f9e57', wallTop: '#fff0a0', line: '#ffffff', sky0: '#52b8ff', sky1: '#cdeeff' };
 
 // 球場地面（z = 0）的形狀
 const arc = (a, ctrl, b, n = 14) => Array.from({ length: n + 1 }, (_, i) => { const u = i / n; return [(1 - u) * (1 - u) * a[0] + 2 * (1 - u) * u * ctrl[0] + u * u * b[0], (1 - u) * (1 - u) * a[1] + 2 * (1 - u) * u * ctrl[1] + u * u * b[1]]; });
@@ -25,7 +25,7 @@ const STRIPES = Array.from({ length: 24 }, (_, i) => i).filter((i) => i * 17 < 4
   return { poly: [[-h0, y0], [h0, y0], [h1, y1], [-h1, y1]], fill: PAL.grassB };
 });
 // 外野牆：立起來的牆面（z 0~8 呎）與牆頂的黃線；轉場拉成俯視後牆面淡出，以免跟 2D 畫面對不上
-const WALL_FACE = WALL.slice(0, -1).map((p, i) => ({ face: [[p[0], p[1], 0], [WALL[i + 1][0], WALL[i + 1][1], 0], [WALL[i + 1][0], WALL[i + 1][1], 8], [p[0], p[1], 8]], fill: i % 2 ? PAL.wall : '#184a35' }));
+const WALL_FACE = WALL.slice(0, -1).map((p, i) => ({ face: [[p[0], p[1], 0], [WALL[i + 1][0], WALL[i + 1][1], 0], [WALL[i + 1][0], WALL[i + 1][1], 8], [p[0], p[1], 8]], fill: ['#e8505b', '#3f8efc', '#ffd43b', '#51cf66'][i % 4] }));
 export const GROUND = [
   { poly: [[-4000, -400], [4000, -400], [4000, 6000], [-4000, 6000]], fill: PAL.grassA },
   { poly: [[-4000, 233], ...WALL, [4000, 233], [4000, 6000], [-4000, 6000]], fill: PAL.stands },
