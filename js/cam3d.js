@@ -8,7 +8,7 @@ const ease = (u) => u * u * (3 - 2 * u);
 export const DCAM = 6, EYE = 3, PLATE_Y = 17 / 12; // 舊的「捕手後方」視角常數，persp() 與測試還在用
 export const DP = DCAM + PLATE_Y;
 // 起點（投手背後）：鏡頭在本壘後方 130 呎（投手板後面約 70 呎）、高約 25 呎，望遠（F 大）看向打者胸口，視線從投手頭上越過
-export const START = { d: 135, alpha: 0.2, F: 10.5, tz: 3.5, shift: 0.5 };
+export const START = { d: 112, alpha: 0.16, F: 11.5, tz: 3.6, shift: 0.55 };
 const D1 = 8000; // 終點：拉到很遠、近似正交的俯視
 const ALPHA1 = Math.PI / 4; // 終點的俯角 45°，配合 2D 球場畫面的「往上偏移」畫法
 
@@ -70,7 +70,7 @@ const STRIPES = Array.from({ length: 24 }, (_, i) => i).filter((i) => i * 17 < 4
 const WALL_FACE = WALL.slice(0, -1).map((p, i) => ({ face: [[p[0], p[1], 0], [WALL[i + 1][0], WALL[i + 1][1], 0], [WALL[i + 1][0], WALL[i + 1][1], 8], [p[0], p[1], 8]], fill: i % 2 ? PAL.wall : '#238a46' }));
 export const GROUND = [
   { poly: [[-4000, -4], [4000, -4], [4000, 6000], [-4000, 6000]], fill: PAL.grassA },
-  { poly: [[-4000, 233], ...WALL, [4000, 233], [4000, 6000], [-4000, 6000]], fill: PAL.stands },
+  { poly: [[-4000, 233], ...WALL, [4000, 233], [4000, 6000], [-4000, 6000]], fill: PAL.stands, crowd: true },
   { poly: [[0, -4], [-233, 233], ...WALL.slice(1, -1), [233, 233]], fill: PAL.grassA },
   ...STRIPES,
   { poly: circle(0, 60.5, 95), fill: PAL.dirt },

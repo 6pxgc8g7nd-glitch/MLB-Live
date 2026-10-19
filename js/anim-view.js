@@ -13,10 +13,10 @@ const ZH = () => S.lang !== 'en';
 const L = (zh, en) => (ZH() ? zh : en);
 
 // 2D 球場畫面直接用 3D 場景的同一份地面資料（GROUND），顏色與形狀才會跟轉場結束時的畫面一模一樣
-const fieldSVG = () => `<g transform="scale(1,-1)">${GROUND.filter((g) => !g.wallFace).map((g) => {
+const fieldSVG = () => `<defs><pattern id="crowd2" width="9" height="7" patternUnits="userSpaceOnUse"><circle cx="1.8" cy="1.8" r="1.3" fill="#ff8fa3"/><circle cx="6.2" cy="2" r="1.3" fill="#ffd84d"/><circle cx="4" cy="5.2" r="1.3" fill="#8fd3ff"/></pattern></defs><g transform="scale(1,-1)">${GROUND.filter((g) => !g.wallFace).map((g) => {
   const pts = g.pts.map((p) => `${p[0].toFixed(1)},${p[1].toFixed(1)}`).join(' ');
   const stroke = g.stroke ? ` stroke="${g.stroke}" stroke-width="${g.sw}" vector-effect="non-scaling-stroke"` : '';
-  return g.closed ? `<polygon points="${pts}" fill="${g.fill || 'none'}"${stroke}${g.op ? ` opacity="${g.op}"` : ''}/>` : `<polyline points="${pts}" fill="none"${stroke}/>`;
+  return (g.closed ? `<polygon points="${pts}" fill="${g.fill || 'none'}"${stroke}${g.op ? ` opacity="${g.op}"` : ''}/>` : `<polyline points="${pts}" fill="none"${stroke}/>`) + (g.crowd ? `<polygon points="${pts}" fill="url(#crowd2)" opacity=".6"/>` : '');
 }).join('')}</g>`;
 
 const f2 = (n) => n.toFixed(3);
@@ -86,14 +86,18 @@ export function openAnim(play, gd, allPlays, feed) {
     const poly = projectPoly(c, [W(p.sh.x - p.ws, 4.95, p.sh.y), W(p.sh.x + p.ws, 4.95, p.sh.y), W(p.hip.x + p.wh, 3.0, p.hip.y), W(p.hip.x - p.wh, 3.0, p.hip.y)], true);
     const hd = P2(p.head);
     const r = 0.82 * u;
-    let s = L(p.hip, p.kneeB, 0.72, PANTS) + L(p.kneeB, p.footB, 0.6, PANTS) + shoe(p.footB) + L(p.hip, p.kneeF, 0.72, PANTS) + L(p.kneeF, p.footF, 0.6, PANTS) + shoe(p.footF);
+    const gs = P2({ x: p.hip.x, z: 0, y: p.hip.y });
+    let s = gs ? `<ellipse cx="${f2(gs.x)}" cy="${f2(gs.y)}" rx="${f2(1.5 * u)}" ry="${f2(0.5 * u * Math.max(0.35, c.up[2]))}" fill="rgba(0,0,0,.28)"/>` : ''; // 腳下的影子
+    s += L(p.hip, p.kneeB, 0.72, PANTS) + L(p.kneeB, p.footB, 0.6, o.sock || jersey) + shoe(p.footB) + L(p.hip, p.kneeF, 0.72, PANTS) + L(p.kneeF, p.footF, 0.6, o.sock || jersey) + shoe(p.footF); // 褲子到膝蓋，膝蓋以下是球隊顏色的長襪
     s += L(p.elbowB, p.handB, 0.4, SKIN) + L(p.sh, p.elbowB, 0.5, jersey);
     if (poly.length > 2) s += `<polygon points="${poly.map(PS).join(' ')}" fill="${jersey}" stroke="${INK}" stroke-width="3" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`;
     s += L({ x: p.hip.x - p.wh * 0.9, z: 3.05, y: p.hip.y }, { x: p.hip.x + p.wh * 0.9, z: 3.05, y: p.hip.y }, 0.2, '#2a3140'); // 腰帶
     s += L(p.elbowF, p.handF, 0.4, SKIN) + L(p.sh, p.elbowF, 0.5, jersey);
     if (hd) {
       const d1 = o.dir || 1;
-      if (o.back) { // 背對鏡頭：只看得到帽子與後腦
+      if (o.mask) { // 主審：深色帽子加護面罩
+        s += `<circle cx="${f2(hd.x)}" cy="${f2(hd.y)}" r="${f2(r)}" fill="#2a3140" stroke="${INK}" stroke-width="3" vector-effect="non-scaling-stroke"/><rect x="${f2(hd.x - r * 0.7)}" y="${f2(hd.y - r * 0.1)}" width="${f2(r * 1.4)}" height="${f2(r * 0.85)}" rx="${f2(r * 0.2)}" fill="#cfd6df" stroke="${INK}" stroke-width="2" vector-effect="non-scaling-stroke"/><path d="M${f2(hd.x - r * 0.7)} ${f2(hd.y + r * 0.2)}H${f2(hd.x + r * 0.7)}M${f2(hd.x - r * 0.7)} ${f2(hd.y + r * 0.45)}H${f2(hd.x + r * 0.7)}M${f2(hd.x)} ${f2(hd.y - r * 0.1)}V${f2(hd.y + r * 0.75)}" stroke="${INK}" stroke-width="1.5" vector-effect="non-scaling-stroke"/>`;
+      } else if (o.back) { // 背對鏡頭：只看得到帽子與後腦
         s += `<circle cx="${f2(hd.x)}" cy="${f2(hd.y)}" r="${f2(r)}" fill="${jersey}" stroke="${INK}" stroke-width="3" vector-effect="non-scaling-stroke"/><circle cx="${f2(hd.x)}" cy="${f2(hd.y - r * 0.15)}" r="${f2(r * 0.18)}" fill="rgba(255,255,255,.55)"/>`;
       } else {
         s += `<circle cx="${f2(hd.x)}" cy="${f2(hd.y)}" r="${f2(r)}" fill="${SKIN}" stroke="${INK}" stroke-width="3" vector-effect="non-scaling-stroke"/>`
@@ -112,7 +116,7 @@ export function openAnim(play, gd, allPlays, feed) {
     const c = camAt(f.m, a, { cx: ec.cx, cy: ec.y0 + hhE / 2, wv: wvE });
     const k = c.k, pxN = 2 / Math.max(1, st.clientWidth); // 1 px 在畫面座標裡有多大
     const P = (q) => `${f2(q.x)},${f2(q.y)}`;
-    let out = '';
+    let out = '<defs><pattern id="crowd3" width="0.06" height="0.05" patternUnits="userSpaceOnUse"><circle cx="0.012" cy="0.012" r="0.009" fill="#ff8fa3"/><circle cx="0.042" cy="0.014" r="0.009" fill="#ffd84d"/><circle cx="0.026" cy="0.036" r="0.009" fill="#8fd3ff"/></pattern></defs>'; // 看台觀眾的圓點花紋
     for (const g of GROUND) {
       const pts = projectPoly(c, g.pts, g.closed);
       if (pts.length < 2) continue;
@@ -120,6 +124,7 @@ export function openAnim(play, gd, allPlays, feed) {
       const gop = g.wallFace ? clamp(1 - k * 1.3, 0, 1) : g.op; // 牆面轉成俯視後淡出，跟 2D 畫面一致
       if (g.wallFace && gop <= 0) continue;
       out += g.closed ? `<polygon points="${pts.map(P).join(' ')}" fill="${g.fill || 'none'}"${stroke}${gop != null ? ` opacity="${gop}"` : ''}/>` : `<polyline points="${pts.map(P).join(' ')}" fill="none"${stroke}/>`;
+      if (g.crowd) out += `<polygon points="${pts.map(P).join(' ')}" fill="url(#crowd3)" opacity=".6"/>`;
     }
     const fade = clamp(1 - k * 1.6, 0, 1);
     const dot = (p, rFt, minPx, attrs) => { const s = project(c, p); return s ? `<circle cx="${f2(s.x)}" cy="${f2(s.y)}" r="${f2(Math.max((rFt * c.F) / s.d, minPx * pxN))}" ${attrs}/>` : ''; };
@@ -133,6 +138,7 @@ export function openAnim(play, gd, allPlays, feed) {
         + f.zone.map((z, i) => dot([z.x, zy, z.z], i === f.zone.length - 1 ? 0.17 : 0.13, 3, `class="pm-${pitchGroup(z.code)}" stroke="#fff" stroke-width="1" vector-effect="non-scaling-stroke" fill-opacity="${i === f.zone.length - 1 ? 1 : 0.7}"`)).join('')
         + (f.impact ? (() => { const s = project(c, [f.impact.x, zy, f.impact.z]); return s ? `<circle class="pv-ring ${f.impact.cls}" cx="${f2(s.x)}" cy="${f2(s.y)}" r="${f2(((0.2 + 0.45 * f.impact.k) * c.F) / s.d)}" opacity="${f2(1 - f.impact.k)}" fill="none" stroke-width="3" vector-effect="non-scaling-stroke"/>` : ''; })() : '') + '</g>';
     }
+    if (fade > 0.02) out += `<g opacity="${f2(fade)}">${figure(c, (x, z) => [0.2 + x * 1.15, -10.5, z * 0.82], standPose(), '#2a3140', { dir: 1, mask: true, sock: '#2a3140' })}</g>`; // 主審站在捕手後面（先畫，才會在捕手後面）
     // 野手：近處是站著的人，拉遠後縮成跟 2D 球場一樣的圓點
     const sorted = f.fielders.map((q) => ({ q, s: project(c, [q.x, q.y, 0]) })).filter((o) => o.s && o.s.d > 4).sort((u, v) => v.s.d - u.s.d);
     for (const { q, s } of sorted) {
@@ -161,7 +167,9 @@ export function openAnim(play, gd, allPlays, feed) {
         const hs = Wb(p.hands.x, p.hands.z), pts = projectPoly(c, [hs, ...tips], true), tl = projectPoly(c, tips, false);
         return (pts.length > 2 ? `<polygon points="${pts.map(P).join(' ')}" fill="rgba(255,255,255,.17)"/>` : '') + (tl.length > 1 ? `<polyline points="${tl.map(P).join(' ')}" fill="none" stroke="rgba(255,236,170,.65)" stroke-width="2.5" stroke-linecap="round" vector-effect="non-scaling-stroke"/>` : '');
       })();
-      out += `<g opacity="${al}">${figure(c, Wb, p, batColor, { dir, extra: sweep + lnB(p.hands, p.tip, 0.11, '#d9b27c') })}</g>`;
+      const mid = { x: p.hands.x + (p.tip.x - p.hands.x) * 0.62, z: p.hands.z + (p.tip.z - p.hands.z) * 0.62 };
+      const bat = lnB(p.hands, p.tip, 0.34, INK) + lnB(p.hands, mid, 0.14, '#e0b27a') + lnB(mid, p.tip, 0.27, '#e0b27a'); // 球棒：細握把＋粗棒頭，黑色描邊
+      out += `<g opacity="${al}">${figure(c, Wb, p, batColor, { dir, extra: sweep + bat })}</g>`;
       // 投手：站在投手丘上，每球出手前抬腿、揮臂，出手瞬間球離手
       const pp = pitcherPose(f.pit, pitDir);
       const Wp = (x, z, y = 0) => [x * 1.15, 59.4 - y, z * 0.82 + 0.8]; // 站在投手板上，y 是往本壘方向的距離
