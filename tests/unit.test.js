@@ -4,7 +4,6 @@ import { segLabel, calYears, calTitleHTML } from '../js/shell.js';
 import { evZh, seriesZh } from '../js/dict.js';
 import { gameState, cardHTML } from '../js/scores.js';
 import { windZh, weatherZh, preGameHTML } from '../js/preview.js';
-import { camAt, project, projectPoly } from '../js/cam3d.js';
 import { pitchPath, hitPlan, hitPos, runnerMoves, buildScript, frameAt, persp, wallR, DP, batPose, pitcherPose, standPose, runPose, crouchPose } from '../js/anim.js';
 import { pitcherPitches, pitchTypeStats, pitcherMapHTML } from '../js/pitchmap.js';
 import { headHTML, textHTML, boxHTML, liveHTML, recapTarget } from '../js/game.js';
@@ -613,28 +612,6 @@ console.log('all tests passed');
   assert.strictEqual(buildScript({ playEvents: [] }).segs.length, 0, '沒有投球就沒有動畫');
 }
 
-// 3D 攝影機：起點是捕手視角，終點與 2D 球場畫面一致
-{
-  const a = 0.75, end = { cx: 20, cy: 90, wv: 400 };
-  const c0 = camAt(0, a, end), c1 = camAt(1, a, end);
-  assert.ok(c0.P[1] > 100 && c0.P[2] > 15 && Math.abs(c0.yaw - Math.PI) < 1e-9, '起點：鏡頭在投手背後、本壘後方 130 呎左右、高處，朝向本壘');
-  const zl = project(c0, [-0.708, 17 / 12, 3]), zr = project(c0, [0.708, 17 / 12, 3]);
-  assert.ok(zr.x < zl.x && Math.abs(zr.x - zl.x) > 0.08 && Math.abs(zr.x - zl.x) < 0.2, '從投手背後看：一壘側（x 正）在畫面左邊，好球帶寬約畫面寬的 5~10%');
-  const ph = project(c0, [0, 59, 4.5]), bz = project(c0, [0, 0, 3.5]);
-  assert.ok(ph.y > bz.y + 0.3 && Math.abs(bz.y) < 0.6, '投手在畫面下方、打者在中間偏上');
-  assert.ok(project(c0, [0, 59, 4.5]).d < project(c0, [0, 0, 3.5]).d / 1.5, '投手離鏡頭近、打者遠');
-  const g = project(c1, [20 + 100, 90 + 50, 0]);
-  assert.ok(Math.abs(g.x - (100 * 2) / 400) < 0.05 && Math.abs(g.y - (-50 * 2) / 400) < 0.05, '終點：地面位置與 2D 球場畫面一致（x 往右、y 往上）');
-  const hi = project(c1, [20, 90, 40]);
-  assert.ok(Math.abs(hi.y + (40 * 2) / 400) < 0.05, '終點：高度 40 呎讓球往畫面上方偏 40 呎');
-  assert.strictEqual(project(camAt(0, a, end), [0, 220, 0]), null, '在鏡頭後方的點不畫');
-  const poly = projectPoly(camAt(0, a, end), [[-4000, -4, 0], [4000, -4, 0], [4000, 6000, 0], [-4000, 6000, 0]]);
-  assert.ok(poly.length >= 4 && poly.every((p) => Number.isFinite(p.x) && Number.isFinite(p.y)), '很大的地面多邊形也能正確裁切');
-  let prevYaw = Infinity;
-  for (let m = 0; m <= 1.0001; m += 0.05) { const y = camAt(m, a, end).yaw; assert.ok(y <= prevYaw + 1e-9 && y >= -1e-9, '方位角從 π 單調轉到 0'); prevYaw = y; }
-  assert.ok(Math.abs(c1.yaw) < 1e-9 && Math.abs(c1.right[0] - 1) < 1e-9, '終點：從本壘後方看向外野，x 往右');
-  for (let m = 0; m <= 1; m += 0.1) { const c = camAt(m, a, end); assert.ok(Number.isFinite(c.F) && c.P.every(Number.isFinite)); }
-}
 
 // 賽前資訊：風向、天氣換算、缺資料時的顯示
 {

@@ -1,12 +1,13 @@
 /* Service Worker：只快取「網頁外殼」，MLB 資料一律走網路，不快取。
  * 外殼採「網路優先、離線才用快取」，所以更新網頁後重新開啟就是新版，不會卡在舊版。
  * SHELL 與 VERSION 由 scripts/sw.mjs 維護（提交時 pre-commit hook 自動執行），不需要手動修改。 */
-const VERSION = 'v230';
+const VERSION = 'v231';
 const CACHE = 'mlb-shell-' + VERSION;
 const SHELL = [
   './',
   'index.html',
   'style.css',
+  'js/anim-3d.js',
   'js/anim-script.js',
   'js/anim-view.js',
   'js/anim.js',
@@ -32,6 +33,7 @@ const SHELL = [
   'js/state.js',
   'js/util.js',
   'js/winprob.js',
+  'js/vendor/three.module.min.js',
   'manifest.webmanifest',
   'icons/apple-touch-icon.png',
   'icons/icon-192.png',

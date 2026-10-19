@@ -226,7 +226,7 @@ shots = [('scores', '#/scores', 'light'), ('gametop', '#/game/1', 'light'), ('pr
 
 failures = []
 with sync_playwright() as p:
-    b = p.chromium.launch()
+    b = p.chromium.launch(args=['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'])  # 動畫用 WebGL；CI 沒有 GPU，靠 SwiftShader 軟體渲染
     for s in shots:
         name, hsh, theme = s[0], s[1], s[2]
         tab = s[3] if len(s) > 3 else 'text'
@@ -300,7 +300,9 @@ with sync_playwright() as p:
             else:
                 pg.evaluate("document.querySelector('.anb[data-an=\"5\"]').click()"); pg.wait_for_timeout(400)
                 info = pg.evaluate("""() => { const el = document.getElementById('an'); if (!el) return null; const c = el._ctl, h = c.sc.segs.find((s) => s.kind === 'hit'); const out = [];
-                  for (const t of [c.sc.caps[1].t1 - 0.3, h.t0 + 0.45, h.t0 + 1.5, c.total]) { c.seek(t); out.push([document.getElementById('anPv').style.opacity, document.getElementById('anSvg').style.opacity, document.getElementById('anPv').innerHTML.length]); }
+                  const cv = document.getElementById('an3d'); const gl = cv && (cv.getContext('webgl2') || cv.getContext('webgl'));
+                  for (const t of [c.sc.caps[1].t1 - 0.3, h.t0 + 0.45, h.t0 + 1.5, c.total]) { c.seek(t); out.push(cv.toDataURL('image/png').length); }
+                  out.push(!!gl, cv ? cv.width : 0);
                   return { out, hud: !document.querySelector('.an-hud').hidden, banner: !document.querySelector('.an-bn').hidden }; }""")
                 print('anim:', info)
                 if not info: failures.append((name, ['點動畫鈕沒有開出動畫']))
@@ -311,7 +313,7 @@ with sync_playwright() as p:
                     print('game hud:', sb)
                     if 'CLE' not in sb[0] and 'CWS' not in sb[0]: failures.append((name, ['動畫的比分板沒有球隊簡稱：%s' % sb]))
                     if not sb[1] or not sb[2] or not sb[3]: failures.append((name, ['動畫的好球帶面板／球種條／結果彈字沒出現：%s' % sb]))
-                    if o[0][0] != '1' or o[2][1] != '1' or o[3][1] != '1' or o[0][2] < 2000 or not info['hud'] or not info['banner']:
+                    if not o[4] or o[5] < 100 or min(o[:4]) < 3000 or len(set(o[:4])) < 3 or not info['hud'] or not info['banner']:
                         failures.append((name, ['動畫畫面不正常：%s' % info]))
                     # 播放控制：暫停、下一球／上一球、時間軸，動作後都要停住並且時間正確
                     pg.evaluate("document.getElementById('an')._ctl.seek(0)"); pg.wait_for_timeout(100)

@@ -14,13 +14,13 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SW = path.join(ROOT, 'sw.js');
 
 // 外殼檔案：更動這些檔案，使用者端就需要新的 VERSION 才會換掉舊快取
-const SHELL_RE = /^(index\.html|style\.css|manifest\.webmanifest|sw\.js|app\.js|js\/[^/]+\.js|icons\/[^/]+\.png|logos\/[^/]+\.svg)$/;
+const SHELL_RE = /^(index\.html|style\.css|manifest\.webmanifest|sw\.js|app\.js|js\/[^/]+\.js|js\/vendor\/[^/]+\.js|icons\/[^/]+\.png|logos\/[^/]+\.svg)$/;
 
 const git = (...args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 26 });
 const ls = (dir, ext) => fs.readdirSync(path.join(ROOT, dir)).filter((f) => f.endsWith(ext)).sort().map((f) => `${dir}/${f}`);
 
 function shellList() {
-  const top = ['index.html', 'style.css', ...ls('js', '.js'), 'manifest.webmanifest'];
+  const top = ['index.html', 'style.css', ...ls('js', '.js'), ...ls('js/vendor', '.js'), 'manifest.webmanifest'];
   return ['./', ...top, ...ls('icons', '.png'), ...ls('logos', '.svg')];
 }
 
